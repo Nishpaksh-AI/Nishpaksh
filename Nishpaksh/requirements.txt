@@ -1,0 +1,16 @@
+streamlit>=1.30
+
+pandas>=1.5
+numpy>=1.23
+scipy>=1.9
+
+matplotlib>=3.6
+seaborn>=0.12
+
+scikit-learn>=1.2
+
+python-docx>=0.8.11
+Pillow>=9.0
+
+# Optional (enable only if report logging is used)
+# mlflow>=2.0

@@ -1,0 +1,29 @@
+name: nishpaksh-env
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+
+  # Core app
+  - streamlit>=1.30
+
+  # Data & numerics
+  - numpy>=1.23
+  - pandas>=1.5
+  - scipy>=1.9
+
+  # Visualization
+  - matplotlib>=3.6
+  - seaborn>=0.12
+
+  # Machine learning
+  - scikit-learn>=1.2
+
+  # Reporting
+  - python-docx>=0.8.11
+  - pillow>=9.0
+
+  # Optional (comment out if not used)
+  # - mlflow>=2.0
