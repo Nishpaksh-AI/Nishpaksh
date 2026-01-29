@@ -3,8 +3,7 @@
 
 # utils/viz_utils_matplotlib.py
 # Visualization utilities for the fairness dashboard
-# - Matplotlib charts (professional styling)
-# - Robust handling of non-numeric labels
+# - Matplotlib charts
 # 
 
 from typing import Dict, List, Optional, Tuple
@@ -18,7 +17,7 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import seaborn as sns
 
-# Set professional styling
+#  styling
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
@@ -584,6 +583,7 @@ def plot_group_error_panel(
     plt.tight_layout()
 
     return fig
+
 
 
 
