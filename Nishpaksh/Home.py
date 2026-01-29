@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 
-# Page config
+# Page configuration
 st.set_page_config(page_title="Nishpaksh", layout="centered")
 
-# ---- PROFESSIONAL THEME + STYLING ----
+#css and html block
 st.markdown(""" 
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -151,3 +151,4 @@ if "uploaded_data" in st.session_state and "model_file" in st.session_state:
     
 else:
     st.sidebar.info("Upload both data and model to proceed.")
+
