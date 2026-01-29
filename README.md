@@ -18,5 +18,5 @@ Preprint available at: https://doi.org/10.48550/arXiv.2601.16926
 ### Authors
 This tool was designed and built by:
 - **Avinash Agarwal** (TEC/DoT, India)
-- **Dr. Ranitha Prasad** (IIIT Delhi, India)
+- **Dr. Ranjitha Prasad** (IIIT Delhi, India)
 - **Shashank Prakash** (IIIT Delhi, India)
