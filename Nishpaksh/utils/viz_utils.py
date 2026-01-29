@@ -326,34 +326,65 @@ def plot_fairness_accuracy_scatter(
     title: str = "Fairness vs Performance",
     jitter: float = 0.0,
 ) -> Figure:
+
+    # -------------------- sanity_check --------------------
     if fairness_metric not in results_df.columns or performance_metric not in results_df.columns:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.text(0.5, 0.5, "Metrics not available", ha='center', va='center', fontsize=14)
+        fig, ax = plt.subplots(figsize=(7, 4.5))
+        ax.text(0.5, 0.5, "Metrics not available", ha="center", va="center", fontsize=12)
         ax.set_title(title)
         return fig
 
     df = results_df[["Model", fairness_metric, performance_metric]].copy()
     df[fairness_metric] = _coerce_numeric(df[fairness_metric])
     df[performance_metric] = _coerce_numeric(df[performance_metric])
+    df = df.dropna()
 
+    if df.empty:
+        fig, ax = plt.subplots(figsize=(7, 4.5))
+        ax.text(0.5, 0.5, "No valid data", ha="center", va="center", fontsize=12)
+        ax.set_title(title)
+        return fig
+
+    # Optional jitter
     if jitter and jitter > 0:
-        df[fairness_metric] = df[fairness_metric] + np.random.normal(0, jitter, size=len(df))
+        df[fairness_metric] += np.random.normal(0, jitter, size=len(df))
 
-    fig, ax = plt.subplots(figsize=(12, 8))
-    
-    models = df["Model"].unique()
-    for i, model in enumerate(models):
-        model_data = df[df["Model"] == model]
-        ax.scatter(model_data[performance_metric], model_data[fairness_metric],
-                  s=25, alpha=0.7, edgecolors='darkslategrey', linewidths=2,
-                  color=MODEL_COLORS[i % len(MODEL_COLORS)], label=model)
-    
-    ax.set_xlabel(performance_metric, fontsize=12, fontweight='bold')
-    ax.set_ylabel(fairness_metric, fontsize=12, fontweight='bold')
-    ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
-    ax.legend(loc='best', framealpha=0.9, edgecolor='black')
-    
+    fig, ax = plt.subplots(figsize=(7, 4.5))  #  smaller canvas
+
+    # -------------------- Scatter --------------------
+    for i, model in enumerate(df["Model"]):
+        row = df[df["Model"] == model].iloc[0]
+
+        ax.scatter(
+            row[performance_metric],
+            row[fairness_metric],
+            s=220,                       #  distinguishable dots
+            alpha=0.8,
+            color=MODEL_COLORS[i % len(MODEL_COLORS)],
+            edgecolors="black",
+            linewidths=1.2,
+            label=model.replace("predicted_", ""),
+            zorder=3,
+        )
+
+    # -------------------- Axes & styling --------------------
+    ax.set_xlabel(performance_metric, fontsize=11, fontweight="bold")
+    ax.set_ylabel(fairness_metric, fontsize=11, fontweight="bold")
+    ax.set_title(title, fontsize=13, fontweight="bold", pad=10)
+
+    ax.tick_params(axis="both", which="major", labelsize=10, length=6, width=1.4)
+
     _setup_professional_style(fig, ax)
+
+    ax.legend(
+    fontsize=10,
+    framealpha=0.95,
+    edgecolor="black",
+    loc="center left",
+    bbox_to_anchor=(1.02, 0.5),
+)
+
+
     plt.tight_layout()
     return fig
 
@@ -553,5 +584,6 @@ def plot_group_error_panel(
     plt.tight_layout()
 
     return fig
+
 
 
