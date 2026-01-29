@@ -178,12 +178,11 @@ if model_file:
     st.success("Model file uploaded.")
 
 st.markdown("---")
-st.sidebar.title("Navigation")
+
 
 if "uploaded_data" in st.session_state and "model_file" in st.session_state:
     st.sidebar.success("Files uploaded")
-    st.sidebar.page_link("pages/1_Pre_Processing.py", label="Pre-Processing")
-    st.sidebar.page_link("pages/2_Inference.py", label="Inference")
-    st.sidebar.page_link("pages/3_Output.py", label="Output")
+    
 else:
     st.sidebar.info("Upload both data and model to proceed.")
+
