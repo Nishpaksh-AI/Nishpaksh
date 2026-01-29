@@ -533,7 +533,7 @@ with col_r:  # MeitY right
             continue
     if not shown: st.write("")
 
-# ------------------ App Logic ------------------
+# ------------------------------------
 st.title("Nishpaksh")
 
 data_file = st.file_uploader("Upload tabular dataset (CSV)", type=["csv"])
@@ -568,9 +568,16 @@ st.sidebar.title("Navigation")
 
 if "uploaded_data" in st.session_state and "model_file" in st.session_state:
     st.sidebar.success("Files uploaded")
-    st.sidebar.page_link("pages/1_Pre_Processing.py", label="Pre-Processing")
-    st.sidebar.page_link("pages/2_Inference.py", label="Inference")
-    st.sidebar.page_link("pages/3_Output.py", label="Output")
+    st.sidebar.page_link("pages/0_survey.py", label="Survey")
+    st.sidebar.page_link("pages/1_thresholds_and_metrics.py", label="Thresholds and metrics")
+    st.sidebar.page_link("pages/2_pre_processing.py", label="Inference")
+    st.sidebar.page_link("pages/3_inference.py", label="Inference")
+    st.sidebar.page_link("pages/4_results.py", label="Results")
+    st.sidebar.page_link("pages/5_report.py", label="Report")
+
+
+    
 else:
     st.sidebar.info("Upload both data and model to proceed.")
+
 
