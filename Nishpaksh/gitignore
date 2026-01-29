@@ -1,0 +1,108 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# =========================
+# Virtual environments
+# =========================
+venv/
+.env/
+.env*/
+.venv/
+conda-env/
+env/
+ENV/
+
+# =========================
+# Jupyter / IPython
+# =========================
+.ipynb_checkpoints/
+.profile_default/
+*.ipynb
+
+# =========================
+# Streamlit
+# =========================
+.streamlit/secrets.toml
+.streamlit/config.toml
+.streamlit/cache/
+.streamlit/session_state/
+
+# =========================
+# Model artifacts
+# =========================
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.onnx
+models/
+checkpoints/
+
+# =========================
+# Data files
+# =========================
+data/
+datasets/
+*.csv
+*.tsv
+*.xlsx
+*.parquet
+*.feather
+
+# =========================
+# Logs & outputs
+# =========================
+logs/
+*.log
+outputs/
+reports/
+results/
+figures/
+plots/
+
+# =========================
+# OS junk
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Editors / IDEs
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# =========================
+# Testing / coverage
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Secrets
+# =========================
+*.env
+*.key
+*.pem
+secrets.json
+
+# =========================
+# Misc
+# =========================
+.cache/
+tmp/
