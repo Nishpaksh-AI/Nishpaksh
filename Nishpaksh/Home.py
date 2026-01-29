@@ -39,7 +39,7 @@ st.markdown("""
         background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
     }
 
-    /* ================= SELECTBOX (FIXED) ================= */
+    /* ================= SELECTBOX ================= */
 
     div[data-testid="stSelectbox"] {
         margin-bottom: 1.5rem !important;
@@ -151,4 +151,5 @@ if "uploaded_data" in st.session_state and "model_file" in st.session_state:
     
 else:
     st.sidebar.info("Upload both data and model to proceed.")
+
 
