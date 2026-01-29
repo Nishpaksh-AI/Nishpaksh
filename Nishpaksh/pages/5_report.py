@@ -1,5 +1,5 @@
 # pages/5_Report.py
-# FINAL REPORT COMPILER — WIRE-FRAME ALIGNED (TEC 7.1 COMPLIANT
+# FINAL REPORT COMPILER — WIRE-FRAME ALIGNED (TEC 7.1 COMPLIANT)
 
 import streamlit as st
 import numpy as np
@@ -10,7 +10,7 @@ import tempfile
 import matplotlib.pyplot as plt
 
 # ==================================================
-# PAGE CONFIG
+# page configuration
 # ==================================================
 st.set_page_config(layout="wide")
 st.title("Final Fairness Evaluation Report")
@@ -901,4 +901,5 @@ if st.button("Generate Final Report"):
 
     st.success("Final report generated successfully.")
     st.download_button("Download Report", open(out, "rb"), file_name=out.name)
+
 
