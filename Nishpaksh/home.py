@@ -146,43 +146,196 @@ with col_r:
 
 # ==================================================
 # ------------------ APP LOGIC ------------------
-# (VERBATIM FROM YOUR FILE — NOT TOUCHED)
 # ==================================================
 st.title("Nishpaksh")
 
-data_file = st.file_uploader("Upload tabular dataset (CSV)", type=["csv"])
-model_file = st.file_uploader("Upload trained model (.pkl or .joblib)", type=["pkl", "joblib"])
+# --------------------------------------------------
+# Initialize session state variables
+# --------------------------------------------------
+if "ground_truth" not in st.session_state:
+    st.session_state["ground_truth"] = None
 
-if data_file:
+if "num_protected_attrs" not in st.session_state:
+    st.session_state["num_protected_attrs"] = 1
+
+# --------------------------------------------------
+# File uploads (widget-only)
+# --------------------------------------------------
+data_file = st.file_uploader(
+    "Upload tabular dataset (CSV)",
+    type=["csv"],
+    key="data_file_input",
+)
+
+model_file = st.file_uploader(
+    "Upload trained model (.pkl or .joblib)",
+    type=["pkl", "joblib"],
+    key="model_file_input",
+)
+
+# --------------------------------------------------
+# Dataset persistence (authoritative)
+# --------------------------------------------------
+if data_file is not None:
     try:
         df = pd.read_csv(data_file)
-        st.session_state["uploaded_data"] = df
-        st.write("Data Preview")
-        st.dataframe(df.head())
-        columns = df.columns.tolist()
 
-        ground_truth_col = st.selectbox("Select ground truth column", options=columns)
-        st.session_state["ground_truth_col"] = ground_truth_col
+        # Detect dataset change
+        if (
+            "uploaded_data" not in st.session_state
+            or not st.session_state["uploaded_data"].equals(df)
+        ):
+            st.session_state["uploaded_data"] = df
+            
+            # Reset config on new data
+            st.session_state["ground_truth"] = None
+            st.session_state["num_protected_attrs"] = 1
+            # Clear any previous protected attributes
+            for key in list(st.session_state.keys()):
+                if key.startswith("protected_attribute_") or key.startswith("privileged_class_"):
+                    del st.session_state[key]
 
-        sensitive_col = st.selectbox("Select sensitive attribute column", options=columns)
-        st.session_state["sensitive_col"] = sensitive_col
-
-        unique_vals = df[sensitive_col].dropna().unique()
-        priv_value = st.selectbox("Select privileged group", options=unique_vals)
-        st.session_state["privileged_value"] = priv_value
     except Exception as e:
         st.error(f"Failed to read uploaded CSV: {e}")
+        st.stop()
 
-if model_file:
-    st.session_state["model_file"] = model_file
-    st.success("Model file uploaded.")
-
-st.markdown("---")
-
-
-if "uploaded_data" in st.session_state and "model_file" in st.session_state:
-    st.sidebar.success("Files uploaded")
-    
+elif "uploaded_data" in st.session_state:
+    df = st.session_state["uploaded_data"]
 else:
-    st.sidebar.info("Upload both data and model to proceed.")
+    df = None
 
+# --------------------------------------------------
+# Configuration UI
+# --------------------------------------------------
+if df is not None:
+    st.write("Data Preview")
+    st.dataframe(df.head())
+
+    columns = df.columns.tolist()
+
+    # ------------------------------
+    # Ground truth
+    # ------------------------------
+    gt_index = 0
+    if st.session_state["ground_truth"] and st.session_state["ground_truth"] in columns:
+        gt_index = columns.index(st.session_state["ground_truth"]) + 1
+
+    gt = st.selectbox(
+        "Select ground truth column",
+        options=[""] + columns,
+        index=gt_index,
+        key="ground_truth_input",
+    )
+
+    if gt != "":
+        st.session_state["ground_truth"] = gt
+
+    # ------------------------------
+    # Number of protected attributes
+    # ------------------------------
+    num = st.radio(
+        "How many protected attributes are there?",
+        options=[1, 2, 3],
+        horizontal=True,
+        index=[1, 2, 3].index(st.session_state["num_protected_attrs"]),
+        key="num_protected_input",
+    )
+
+    st.session_state["num_protected_attrs"] = num
+
+    # ------------------------------
+    # Protected attributes
+    # ------------------------------
+    for i in range(st.session_state["num_protected_attrs"]):
+        st.markdown(f"### Protected Attribute {i + 1}")
+
+        # Get saved values
+        saved_attr = st.session_state.get(f"protected_attribute_{i+1}", None)
+        saved_priv = st.session_state.get(f"privileged_class_{i+1}", None)
+
+        # Attribute selectbox
+        attr_index = 0
+        if saved_attr and saved_attr in columns:
+            attr_index = columns.index(saved_attr) + 1
+
+        attr = st.selectbox(
+            f"Select protected attribute {i + 1}",
+            options=[""] + columns,
+            index=attr_index,
+            key=f"protected_attr_input_{i}",
+        )
+
+        if attr != "":
+            st.session_state[f"protected_attribute_{i+1}"] = attr
+
+            # Get unique values for this attribute
+            values = df[attr].dropna().astype(str).unique().tolist()
+
+            # Privileged class selectbox
+            priv_index = 0
+            if saved_priv and saved_priv in values:
+                priv_index = values.index(saved_priv) + 1
+
+            priv = st.selectbox(
+                f"Select privileged class for {attr}",
+                options=[""] + values,
+                index=priv_index,
+                key=f"privileged_value_input_{i}",
+            )
+
+            if priv != "":
+                st.session_state[f"privileged_class_{i+1}"] = priv
+
+# --------------------------------------------------
+# Model file persistence
+# --------------------------------------------------
+if model_file is not None:
+    st.session_state["model_file"] = model_file
+
+# --------------------------------------------------
+# DEBUG — AUTHORITATIVE STATE
+# --------------------------------------------------
+st.markdown("---")
+st.subheader("Authoritative Configuration")
+
+# Build display dict
+config_display = {
+    "ground_truth": st.session_state.get("ground_truth"),
+    "num_protected_attrs": st.session_state.get("num_protected_attrs"),
+}
+
+for i in range(1, 4):
+    if f"protected_attribute_{i}" in st.session_state:
+        config_display[f"protected_attribute_{i}"] = st.session_state[f"protected_attribute_{i}"]
+    if f"privileged_class_{i}" in st.session_state:
+        config_display[f"privileged_class_{i}"] = st.session_state[f"privileged_class_{i}"]
+
+config_display["uploaded_data_present"] = "uploaded_data" in st.session_state
+config_display["model_file_present"] = "model_file" in st.session_state
+
+st.json(config_display)
+
+# --------------------------------------------------
+# Sidebar status
+# --------------------------------------------------
+st.sidebar.title("Navigation")
+
+# Check if configuration is complete
+config_complete = (
+    st.session_state.get("ground_truth") is not None
+    and st.session_state.get("model_file") is not None
+)
+
+# Check if all protected attributes are configured
+for i in range(1, st.session_state.get("num_protected_attrs", 1) + 1):
+    if (
+        f"protected_attribute_{i}" not in st.session_state
+        or f"privileged_class_{i}" not in st.session_state
+    ):
+        config_complete = False
+        break
+
+if config_complete:
+    st.sidebar.success("Configuration complete")
+else:
+    st.sidebar.warning("Complete configuration on Home page")
