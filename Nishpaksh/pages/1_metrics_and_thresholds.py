@@ -1,8 +1,11 @@
-# pages/1_metrics_and_thresholds.py
+# pages/4_Metrics_and_Thresholds.py
 """
+Standalone Metrics & Thresholds page (improved UX)
 - User selects problem type (classification/regression/clustering/recommendation)
 - Metrics selection is a checkbox grid (with Select all / Clear selection)
-- Thresholds saved to st.session_state['thresholds']
+- Threshold numeric inputs appear inline when a metric is checked
+- Optional notes removed (per request)
+- Thresholds saved to st.session_state['thresholds'] but not applied in Results (standalone)
 """
 
 import streamlit as st
@@ -640,17 +643,58 @@ problem = st.radio(
 
 st.markdown(f"**Problem type:** `{problem}`")
 
-# Group fairness metrics (kept same for simplicity)
+# --------------------------------------------------
+# Guard + reconstruct protected attributes (AUTHORITATIVE)
+# --------------------------------------------------
+num_protected = st.session_state.get("num_protected_attrs")
+
+if not isinstance(num_protected, int) or num_protected < 1:
+    st.warning("Protected attributes not configured on Home page.")
+    st.stop()
+
+protected_attrs = []
+
+for i in range(1, num_protected + 1):
+    attr_key = f"protected_attribute_{i}"
+    priv_key = f"privileged_class_{i}"
+
+    attr = st.session_state.get(attr_key)
+    priv = st.session_state.get(priv_key)
+
+    if not isinstance(attr, str) or not isinstance(priv, str):
+        st.warning(
+            f"Protected attribute {i} or its privileged class is missing."
+        )
+        st.stop()
+
+    protected_attrs.append(
+        {
+            "attribute": attr,
+            "privileged_class": priv,
+        }
+    )
+
+# --------------------------------------------------
+# Ground truth check (AUTHORITATIVE)
+# --------------------------------------------------
+ground_truth = st.session_state.get("ground_truth")
+
+if not isinstance(ground_truth, str) or ground_truth == "":
+    st.warning("Ground truth not configured on Home page.")
+    st.stop()
+
+# --------------------------------------------------
+# Fairness metrics (UNCHANGED)
+# --------------------------------------------------
 GROUP_METRICS = [
     "Statistical Parity Difference",
     "Disparate Impact",
     "Average Odds Difference",
     "Equal Opportunity Difference",
     "Error Rate Difference",
-    "Calibration Difference (global)"
+    "Calibration Difference (global)",
 ]
 
-# sensible defaults
 DEFAULTS = {
     "Statistical Parity Difference": 0.10,
     "Disparate Impact": 0.80,
@@ -660,77 +704,95 @@ DEFAULTS = {
     "Calibration Difference (global)": 0.05,
 }
 
-# Load existing thresholds if present
-saved_thresholds = st.session_state.get("thresholds", {}) if "thresholds" in st.session_state else {}
+# --------------------------------------------------
+# Initialize thresholds store (AUTHORITATIVE)
+# --------------------------------------------------
+if "thresholds" not in st.session_state:
+    st.session_state["thresholds"] = {}
 
-# Keep an internal selection state so Select all / Clear selection work smoothly
-if "metric_selection" not in st.session_state or st.session_state.get("_metric_selection_problem") != problem:
-    # initialize selection: checked if present in saved thresholds OR default to checked
-    st.session_state["metric_selection"] = {m: (m in saved_thresholds or True) for m in GROUP_METRICS}
-    st.session_state["_metric_selection_problem"] = problem
+# --------------------------------------------------
+# Metric selection PER protected attribute
+# --------------------------------------------------
+for idx, p in enumerate(protected_attrs):
+    attr = p["attribute"]
 
-# header controls: select all / clear all
-col_a, col_b, _ = st.columns([1, 1, 6])
-with col_a:
-    if st.button("Select all metrics"):
-        for m in GROUP_METRICS:
-            st.session_state["metric_selection"][m] = True
-with col_b:
-    if st.button("Clear all"):
-        for m in GROUP_METRICS:
-            st.session_state["metric_selection"][m] = False
+    st.markdown(f"## Metrics & thresholds for **{attr}**")
 
-st.markdown("### Choose group/fairness metrics to configure")
+    if attr not in st.session_state["thresholds"]:
+        st.session_state["thresholds"][attr] = {}
 
-# Render checkboxes in two columns for compactness
-ncols = 2
-cols = st.columns(ncols)
-for i, m in enumerate(GROUP_METRICS):
-    col = cols[i % ncols]
-    key_chk = f"chk_{problem}_{m}"
-    # default checked state from session state
-    default_checked = st.session_state["metric_selection"].get(m, True)
-    checked = col.checkbox(label=m, value=default_checked, key=key_chk)
-    # persist into metric_selection map so select-all/clear-all reflect current state
-    st.session_state["metric_selection"][m] = checked
+    saved_thresholds = st.session_state["thresholds"][attr]
 
-    # inline threshold input appears immediately below the checkbox (indented)
-    if checked:
-        # Use a small number_input; keep format flexible for different metric types
-        key_th = f"th_{problem}_{m}"
-        # decide initial value: saved thresholds -> saved, else DEFAULTS
-        init_val = saved_thresholds.get(m, {}).get("value", DEFAULTS.get(m, 0.0))
-        # If init_val might be non-finite, fallback
-        try:
-            init_val = float(init_val)
-            if math.isnan(init_val) or math.isinf(init_val):
-                init_val = float(DEFAULTS.get(m, 0.0))
-        except Exception:
-            init_val = float(DEFAULTS.get(m, 0.0))
-        # layout: place threshold input immediately after the checkbox
-        col.number_input(f"Threshold for {m}", value=init_val, step=0.01, format="%.4f", key=key_th)
+    sel_key = f"metric_selection_{attr}"
+    prob_key = f"_metric_problem_{attr}"
 
-st.markdown("---")
-# Build thresholds dict from current checkbox states + inputs
-thresholds = {}
-for m in GROUP_METRICS:
-    if st.session_state["metric_selection"].get(m, False):
-        key_th = f"th_{problem}_{m}"
-        # number_input always exists as a widget when metric is checked; try to read. If missing, fallback.
-        val = st.session_state.get(key_th, DEFAULTS.get(m, 0.0))
-        thresholds[m] = {"value": float(val), "problem": problem}
+    if sel_key not in st.session_state or st.session_state.get(prob_key) != problem:
+        st.session_state[sel_key] = {
+            m: (m in saved_thresholds or True) for m in GROUP_METRICS
+        }
+        st.session_state[prob_key] = problem
 
-col1, col2 = st.columns([1,1])
-with col1:
-    if st.button("Save thresholds to session"):
-        st.session_state["thresholds"] = thresholds
-        st.success("Saved thresholds to session.")
-with col2:
-    if st.button("Clear thresholds from session"):
-        if "thresholds" in st.session_state:
-            del st.session_state["thresholds"]
-        st.success("Cleared thresholds from session.")
+    # --------------------------------------------------
+    # Select / clear buttons
+    # --------------------------------------------------
+    c1, c2, _ = st.columns([1, 1, 6])
+    with c1:
+        if st.button("Select all", key=f"select_all_{attr}"):
+            for m in GROUP_METRICS:
+                st.session_state[sel_key][m] = True
 
+    with c2:
+        if st.button("Clear all", key=f"clear_all_{attr}"):
+            for m in GROUP_METRICS:
+                st.session_state[sel_key][m] = False
 
+    st.markdown("### Choose fairness metrics")
 
+    cols = st.columns(2)
+    for i, m in enumerate(GROUP_METRICS):
+        col = cols[i % 2]
 
+        chk_key = f"chk_{attr}_{problem}_{m}"
+        checked = col.checkbox(
+            m,
+            value=st.session_state[sel_key].get(m, True),
+            key=chk_key,
+        )
+
+        st.session_state[sel_key][m] = checked
+
+        if checked:
+            th_key = f"th_{attr}_{problem}_{m}"
+
+            init_val = saved_thresholds.get(
+                m, {}
+            ).get("value", DEFAULTS[m])
+
+            val = col.number_input(
+                f"Threshold for {m}",
+                value=float(init_val),
+                step=0.01,
+                format="%.4f",
+                key=th_key,
+            )
+
+            st.session_state["thresholds"][attr][m] = {
+                "value": float(val),
+                "problem": problem,
+            }
+
+    st.markdown("---")
+
+# --------------------------------------------------
+# Final controls
+# --------------------------------------------------
+c1, c2 = st.columns(2)
+
+with c1:
+    if st.button("Save thresholds"):
+        st.success("Thresholds saved for all protected attributes.")
+
+with c2:
+    if st.button("Clear thresholds"):
+        del st.session_state["thresholds"]
+        st.success("All thresholds cleared.")
