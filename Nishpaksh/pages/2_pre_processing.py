@@ -545,7 +545,7 @@ st.markdown(
 )
 
 # --------------------------------------------------
-# Preconditions
+# Preconditions (UPDATED: flat authoritative keys)
 # --------------------------------------------------
 if "uploaded_data" not in st.session_state or not isinstance(
     st.session_state["uploaded_data"], pd.DataFrame
@@ -555,12 +555,36 @@ if "uploaded_data" not in st.session_state or not isinstance(
 
 df = st.session_state["uploaded_data"]
 
-ground_truth_col = st.session_state.get("ground_truth_col")
-sensitive_col = st.session_state.get("sensitive_col")
+ground_truth = st.session_state.get("ground_truth")
+num_protected = st.session_state.get("num_protected_attrs")
 
-if ground_truth_col is None:
+if not isinstance(ground_truth, str) or ground_truth == "":
     st.warning("Ground truth column not set on Home page.")
     st.stop()
+
+if not isinstance(num_protected, int) or num_protected < 1:
+    st.warning("Protected attributes not configured on Home page.")
+    st.stop()
+
+# --------------------------------------------------
+# Reconstruct protected attributes (AUTHORITATIVE)
+# --------------------------------------------------
+protected_attrs = []
+
+for i in range(1, num_protected + 1):
+    attr = st.session_state.get(f"protected_attribute_{i}")
+    priv = st.session_state.get(f"privileged_class_{i}")
+
+    if not isinstance(attr, str) or not isinstance(priv, str):
+        st.warning(f"Protected attribute {i} not fully configured.")
+        st.stop()
+
+    protected_attrs.append(
+        {
+            "attribute": attr,
+            "privileged_class": priv,
+        }
+    )
 
 # --------------------------------------------------
 # Initialize session_state container (once)
@@ -569,7 +593,7 @@ if "preproc" not in st.session_state:
     st.session_state["preproc"] = {
         "ignore_cols": [],
         "eda_done": False,
-        "leakage": None,
+        "leakage": {},
         "models": None,
         "user_narratives": {},
         "completed": False,
@@ -586,12 +610,12 @@ section = st.sidebar.radio(
         "Exploratory Data Analysis",
         "Leakage / Proxy Check",
         "Model Training & Prediction Append",
-        "System Description (User Input)",
+        
     ],
 )
 
 # ==================================================
-# 1. Exploratory Data Analysis (Preview Only)
+# 1. Exploratory Data Analysis (UNCHANGED)
 # ==================================================
 if section == "Exploratory Data Analysis":
     st.subheader("Exploratory Data Analysis (Preview)")
@@ -612,14 +636,10 @@ if section == "Exploratory Data Analysis":
     PREPROC["eda_done"] = True
 
 # ==================================================
-# 2. Leakage / Proxy Check (Preview Only)
+# 2. Leakage / Proxy Check (UPDATED ONLY HERE)
 # ==================================================
 elif section == "Leakage / Proxy Check":
-    st.subheader("Sensitive Attribute Leakage Check")
-
-    if sensitive_col is None:
-        st.info("Sensitive attribute not set on Home page.")
-        st.stop()
+    st.subheader("Sensitive Attribute Leakage / Proxy Check")
 
     ignore_cols = st.multiselect(
         "Columns to exclude",
@@ -628,50 +648,77 @@ elif section == "Leakage / Proxy Check":
     )
     PREPROC["ignore_cols"] = ignore_cols
 
-    feature_cols = [
-        c
-        for c in df.columns
-        if c not in ignore_cols + [sensitive_col, ground_truth_col]
-    ]
+    leakage_results = {}
 
-    if not feature_cols:
-        st.warning("No usable features after exclusions.")
-        st.stop()
+    for p in protected_attrs:
+        sens_col = p["attribute"]
+        priv_class = p["privileged_class"]
 
-    X = pd.get_dummies(df[feature_cols].fillna("NA"))
-    y = LabelEncoder().fit_transform(df[sensitive_col].astype(str))
+        st.markdown(f"### Proxy analysis for `{sens_col}`")
+        st.caption(f"Privileged class: `{priv_class}`")
 
-    Xtr, Xte, ytr, yte = train_test_split(
-        X, y, test_size=0.3, random_state=42, stratify=y if len(set(y)) > 1 else None
-    )
+        feature_cols = [
+            c
+            for c in df.columns
+            if c not in ignore_cols
+            and c != sens_col
+            and c != ground_truth
+        ]
 
-    clf = RandomForestClassifier(n_estimators=200, random_state=42)
-    clf.fit(Xtr, ytr)
-    acc = clf.score(Xte, yte)
+        if not feature_cols:
+            st.warning("No usable features after exclusions.")
+            continue
 
-    importances = (
-        pd.Series(clf.feature_importances_, index=X.columns)
-        .sort_values(ascending=False)
-        .head(20)
-    )
+        X = pd.get_dummies(df[feature_cols].fillna("NA"))
+        y = df[sens_col].astype(str)
 
-    st.metric("Leakage prediction accuracy", f"{acc:.3f}")
+        if y.nunique() < 2:
+            st.warning("Sensitive attribute has fewer than two unique values.")
+            continue
 
-    fig, ax = plt.subplots(figsize=(7, 4))
-    importances.iloc[::-1].plot(kind="barh", ax=ax)
-    ax.set_title(f"Top features predicting `{sensitive_col}`")
-    st.pyplot(fig)
-    plt.close(fig)
+        y_enc = LabelEncoder().fit_transform(y)
 
-    PREPROC["leakage"] = {
-        "accuracy": float(acc),
-        "top_features": importances.reset_index().rename(
-            columns={"index": "feature", 0: "importance"}
-        ),
-    }
+        from sklearn.feature_selection import mutual_info_classif
+
+        mi = mutual_info_classif(
+            X,
+            y_enc,
+            discrete_features="auto",
+            random_state=42,
+        )
+
+        mi_df = (
+            pd.DataFrame(
+                {
+                    "feature": X.columns,
+                    "mutual_information": mi,
+                }
+            )
+            .sort_values("mutual_information", ascending=False)
+            .head(20)
+        )
+
+        # ---- Plot (proxy strength) ----
+        fig, ax = plt.subplots(figsize=(7, 4))
+        mi_df.iloc[::-1].set_index("feature")["mutual_information"].plot(
+            kind="barh", ax=ax
+        )
+        ax.set_title(f"Top proxy features for `{sens_col}`")
+        ax.set_xlabel("Mutual Information")
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.dataframe(mi_df, use_container_width=True)
+
+        leakage_results[sens_col] = {
+            "privileged_class": priv_class,
+            "top_proxy_features": mi_df,
+        }
+
+    PREPROC["leakage"] = leakage_results
 
 # ==================================================
-# 3. Model Training & Prediction Append
+# 3. Model Training & Prediction Append (UNCHANGED)
 # ==================================================
 elif section == "Model Training & Prediction Append":
     st.subheader("Baseline Model Training")
@@ -692,8 +739,8 @@ elif section == "Model Training & Prediction Append":
 
     ignore_cols = PREPROC.get("ignore_cols", [])
 
-    X = df.drop(columns=ignore_cols + [ground_truth_col], errors="ignore")
-    y = LabelEncoder().fit_transform(df[ground_truth_col].astype(str))
+    X = df.drop(columns=ignore_cols + [ground_truth], errors="ignore")
+    y = LabelEncoder().fit_transform(df[ground_truth].astype(str))
 
     num_cols = X.select_dtypes(include=[np.number]).columns.tolist()
     cat_cols = X.select_dtypes(exclude=[np.number]).columns.tolist()
@@ -715,13 +762,12 @@ elif section == "Model Training & Prediction Append":
         pipe.fit(Xtr, ytr)
 
         preds = pipe.predict(X)
-        col_name = f"predicted_{name}"
-        df[col_name] = preds
+        df[f"predicted_{name}"] = preds
 
         yhat = pipe.predict(Xte)
         results.append(
             {
-                "Model": col_name,
+                "Model": name,
                 "Accuracy": accuracy_score(yte, yhat),
                 "Precision": precision_score(yte, yhat, zero_division=0),
                 "Recall": recall_score(yte, yhat, zero_division=0),
@@ -735,34 +781,6 @@ elif section == "Model Training & Prediction Append":
     st.session_state["uploaded_data"] = df
     PREPROC["models"] = res_df
 
-# ==================================================
-# 4. System Description (User Input — Verbatim)
-# ==================================================
-elif section == "System Description (User Input)":
-    st.subheader("AI System & Pipeline Description")
-
-    st.markdown(
-        "This text will appear **verbatim** in the final certification report. "
-        "No rewriting or summarization will be applied."
-    )
-
-    system_desc = st.text_area(
-        "AI system description (P14)",
-        value=PREPROC["user_narratives"].get("P14", ""),
-        height=180,
-    )
-
-    pipeline_desc = st.text_area(
-        "Data, model, and pipeline description (P15)",
-        value=PREPROC["user_narratives"].get("P15", ""),
-        height=180,
-    )
-
-    if st.button("Confirm and lock descriptions"):
-        PREPROC["user_narratives"]["P14"] = system_desc
-        PREPROC["user_narratives"]["P15"] = pipeline_desc
-        PREPROC["completed"] = True
-        st.success("Descriptions saved and locked for final report.")
 
 # --------------------------------------------------
 # Footer
