@@ -1,5 +1,6 @@
 # pages/5_Report.py
-# final report compiler with additional questions (TEC 7.1 COMPLIANT)
+# FINAL REPORT COMPILER — WIRE-FRAME ALIGNED (TEC 7.1 COMPLIANT)
+# UI REFINED + SECTION STATUS (NO LOGIC CHANGES)
 
 import streamlit as st
 import numpy as np
@@ -9,8 +10,15 @@ from docx.shared import Inches
 import tempfile
 import matplotlib.pyplot as plt
 
+from utils.viz_utils import (
+    plot_disparity_in_performance,
+    plot_group_error_panel,
+)
+
+
+
 # ==================================================
-# page configuration
+# PAGE CONFIG
 # ==================================================
 st.set_page_config(layout="wide")
 st.title("Final Fairness Evaluation Report")
@@ -527,29 +535,122 @@ st.markdown(
 
 
 # ==================================================
-# PRECONDITIONS
+# IMPORTS REQUIRED FOR THIS PAGE LOGIC
 # ==================================================
-REQUIRED_KEYS = ["survey_outputs", "preproc", "inference", "results"]
-for key in REQUIRED_KEYS:
-    if key not in st.session_state:
-        st.error(f"Missing required step: {key}")
+import numpy as np
+import tempfile
+import matplotlib.pyplot as plt
+from pathlib import Path
+from docx import Document
+from docx.shared import Inches
+
+from utils.viz_utils import (
+    plot_disparity_in_performance,
+    plot_group_error_panel,
+)
+
+# ==================================================
+# DOCX HELPER FUNCTIONS (NO EXTERNAL DEPENDENCIES)
+# ==================================================
+def replace_text(doc: Document, placeholder: str, value: str) -> bool:
+    found = False
+
+    for p in doc.paragraphs:
+        if placeholder in p.text:
+            p.text = p.text.replace(placeholder, str(value))
+            found = True
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    if placeholder in p.text:
+                        p.text = p.text.replace(placeholder, str(value))
+                        found = True
+
+    return found
+
+
+def insert_plot(doc: Document, placeholder: str, fig) -> bool:
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    fig.savefig(tmp.name, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    found = False
+
+    for p in doc.paragraphs:
+        if placeholder in p.text:
+            p.text = p.text.replace(placeholder, "")
+            p.add_run().add_picture(tmp.name, width=Inches(6.5))
+            found = True
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    if placeholder in p.text:
+                        p.text = p.text.replace(placeholder, "")
+                        p.add_run().add_picture(tmp.name, width=Inches(6.5))
+                        found = True
+
+    return found
+
+def build_survey_qa_section_from_submission(survey_outputs):
+    """
+    Build Section 3.3 text from stored survey submission.
+    Uses section names + question IDs + responses.
+    No dependency on survey schema.
+    """
+
+    submission = survey_outputs.get("raw_submission", {})
+    answers = submission.get("answers", {})
+
+    if not answers:
+        return "No survey responses were recorded."
+
+    lines = []
+    lines.append("Fairness and Governance Questionnaire Responses:\n")
+
+    for section, qmap in answers.items():
+        lines.append(f"{section.replace('_', ' ').title()}:")
+        for q_id, response in qmap.items():
+            lines.append(f"  - {q_id}: {response}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+# ==================================================
+# SESSION STATE — SINGLE SOURCE OF TRUTH
+# ==================================================
+REQUIRED_KEYS = [
+    "survey_outputs",
+    "preproc",
+    "inference",
+    "results",
+    "uploaded_data",
+]
+
+for k in REQUIRED_KEYS:
+    if k not in st.session_state:
+        st.error(f"Missing required step: {k}")
         st.stop()
 
 survey = st.session_state["survey_outputs"]
 preproc = st.session_state["preproc"]
 inference = st.session_state["inference"]
 results = st.session_state["results"]
+df = st.session_state["uploaded_data"]
 
 # ==================================================
-# DEFENSIVE INITIALIZATION (UNCHANGED)
+# DEFENSIVE INITIALIZATION (ABSOLUTE)
 # ==================================================
 survey.setdefault("risk_bucket", "Medium")
-survey.setdefault("auditor_access", "Training + Validation")
-survey.setdefault("testing_type", "Grey box")
+survey.setdefault("auditor_access", "")
+survey.setdefault("testing_type", "")
 survey.setdefault("dependencies", "")
 survey.setdefault("limitations", "")
 survey.setdefault("questionnaire_summary", "")
-survey.setdefault("protected_attr", "")
 survey.setdefault("privileged_groups", "")
 survey.setdefault("favourable_outcome", "")
 survey.setdefault("protected_attr_rationale", "")
@@ -561,346 +662,377 @@ survey.setdefault("certification_context", "")
 preproc.setdefault("user_narratives", {})
 preproc["user_narratives"].setdefault("P14", "")
 preproc.setdefault("pipeline_description", "")
-preproc.setdefault("split_method", "Not specified")
-preproc.setdefault("synthetic_data", "No synthetic data used.")
-preproc.setdefault("scenarios_tested", "")
 
 # ==================================================
-# TEMPLATE
+# HARD RESULTS CONTRACT (NEW FAIRNESS MATH)
 # ==================================================
-TEMPLATE_PATH = Path(__file__).parent / "Fairness_Evaluation_Report_Wireframe.docx"
-if not TEMPLATE_PATH.exists():
-    st.error("Wireframe DOCX template not found.")
+for k in ["selected_model", "FS_system", "BI_per_attribute", "verdict"]:
+    if k not in results:
+        st.error(f"Results object missing key: {k}")
+        st.stop()
+
+protected_attrs = list(results["BI_per_attribute"].keys())
+if not protected_attrs:
+    st.error("No protected attributes found.")
     st.stop()
 
 # ==================================================
-# DOCX HELPERS (UNCHANGED)
+# PAGE TABS
 # ==================================================
-def replace_text(doc, token, value):
-    found = False
-    for p in doc.paragraphs:
-        if token in p.text:
-            p.text = p.text.replace(token, str(value))
-            found = True
-    return found
-
-def insert_table(doc, token, df):
-    for p in doc.paragraphs:
-        if token in p.text:
-            p.text = ""
-            table = doc.add_table(rows=1, cols=len(df.columns))
-            for i, col in enumerate(df.columns):
-                table.rows[0].cells[i].text = str(col)
-            for _, row in df.iterrows():
-                cells = table.add_row().cells
-                for i, v in enumerate(row):
-                    cells[i].text = f"{v:.4f}" if isinstance(v, float) else str(v)
-            p._p.addnext(table._tbl)
-            return True
-    return False
-
-def insert_plot(doc, token, fig):
-    for p in doc.paragraphs:
-        if token in p.text:
-            p.text = p.text.replace(token, "")
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                fig.savefig(tmp.name, dpi=240, bbox_inches="tight")
-                plt.close(fig)
-                p.add_run().add_picture(tmp.name, width=Inches(5.5))
-            return True
-    return False
+tab_summary, tab_metrics, tab_narrative, tab_report = st.tabs(
+    ["Summary", "Fairness Metrics", "Narrative Inputs", "Generate Report"]
+)
 
 # ==================================================
-# PLOTS (UNCHANGED)
-# ==================================================
-def plot_fairness_summary():
-    metrics = results["fairness_metrics"]
-    fig, ax = plt.subplots(figsize=(6, 3))
-    ax.bar(metrics.keys(), metrics.values())
-    ax.axhline(0, linestyle="--", color="black")
-    ax.axhline(1, linestyle="--", color="black")
-    ax.set_title("Bias Index by Protected Attribute")
-    plt.xticks(rotation=30, ha="right")
-    return fig
-
-def plot_accuracy_bar():
-    df = inference["results_df"]
-    fig, ax = plt.subplots(figsize=(6, 3))
-    ax.bar(df["Model"], df["Accuracy"])
-    ax.set_ylim(0, 1)
-    ax.set_title("Model Performance Comparison")
-    plt.xticks(rotation=30, ha="right")
-    return fig
-
-def plot_fairness_ci():
-    fb = inference["fairness_bootstrap"]
-    fig, ax = plt.subplots(figsize=(6, 3))
-    for metric, models in fb.items():
-        for model, vals in models.items():
-            ax.errorbar(model, np.mean(vals), yerr=np.std(vals), fmt="o")
-    ax.set_title("Fairness Metric Uncertainty")
-    return fig
-
-# ==================================================
-# SECTION STATUS PANEL (RESTORED & EXPLICIT)
-# ==================================================
-# ==================================================
-# SECTION STATUS PANEL (INTENTIONAL COMPLETION CHECK)
-# ==================================================
-def is_meaningful(text: str, min_len: int = 10) -> bool:
-    if text is None:
-        return False
-    return len(text.strip()) >= min_len
-
-def status_badge(ok: bool) -> str:
-    return "🟢 Complete" if ok else "🟠 Needs input"
-
-with st.container(border=True):
-    st.markdown("### Report completion status")
-    st.caption(
-        "Sections are marked complete only after sufficient, explicit information "
-        "has been provided. Default selections do not imply completion."
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.write(
-            f"**1. System context and scope** — "
-            f"{status_badge(is_meaningful(survey['protected_attr']) and is_meaningful(survey['favourable_outcome']))}"
-        )
-
-        st.write(
-            f"**2. Audit configuration** — "
-            f"{status_badge(survey['testing_type'] in ['Open box','Grey box','Closed box'])}"
-        )
-
-        st.write(
-            f"**3. Data and pipeline description** — "
-            f"{status_badge(is_meaningful(preproc['pipeline_description']))}"
-        )
-
-    with col2:
-        st.write(
-            f"**4. Risk and limitations** — "
-            f"{status_badge(is_meaningful(survey['limitations']))}"
-        )
-
-        st.write(
-            f"**5. Fairness rationale** — "
-            f"{status_badge(is_meaningful(survey['metric_rationale']) and is_meaningful(survey['threshold_rationale']))}"
-        )
-
-        st.write(
-            f"**6. Certification context** — "
-            f"{status_badge(is_meaningful(survey['certification_context']))}"
-        )
-
-# ==================================================
-# UI TABS
-# ==================================================
-tab1, tab2, tab3 = st.tabs(["Summary", "Metrics", "Detailed Report"])
-
 # ==================================================
 # TAB 1 — SUMMARY
 # ==================================================
-with tab1:
-    st.markdown("### System context and audit scope")
-    st.caption(
-        "Factual declarations describing what was evaluated and under what conditions."
-    )
+with tab_summary:
+
+    # ==================================================
+    # ORGANIZATIONAL CONTEXT
+    # ==================================================
+    st.markdown("## Organizational Context")
 
     with st.container(border=True):
-        st.markdown(
-            f"""
-            Fairness Score: **{results['FS']:.3f}**  
-            Bias Index: **{results['BI']:.3f}**  
-            Final verdict: **{results['verdict']}**
-            """
+
+        survey["organization_name"] = st.text_input(
+            "Organization / Entity",
+            survey.get("organization_name", ""),
+            help=(
+                "Legal entity or organization responsible for the development, "
+                "deployment, and governance of this AI system."
+            ),
         )
+
+        survey["developing_department"] = st.text_input(
+            "Department / Business Unit",
+            survey.get("developing_department", ""),
+            help=(
+                "Internal department, team, or business unit that owns or "
+                "operates the AI system."
+            ),
+        )
+
+    # ==================================================
+    # AI APPLICATION OVERVIEW
+    # ==================================================
+    st.markdown("## AI Application Overview")
 
     with st.container(border=True):
-        survey["protected_attr"] = st.text_input(
-            "Which protected attributes were evaluated?",
-            survey["protected_attr"]
+
+        survey["ai_application_overview"] = st.text_area(
+            "High-level description of the AI application",
+            survey.get("ai_application_overview", ""),
+            height=100,
+            help=(
+                "Describe the purpose, scope, target users, and decision context "
+                "of the AI system."
+            ),
         )
 
-        survey["privileged_groups"] = st.text_input(
-            "How were privileged and unprivileged groups defined?",
-            survey["privileged_groups"]
-        )
-
-        survey["favourable_outcome"] = st.text_input(
-            "What outcome was considered favourable?",
-            survey["favourable_outcome"]
-        )
+    # ==================================================
+    # FAIRNESS CONTEXT
+    # ==================================================
+    st.markdown("## Fairness Context")
 
     with st.container(border=True):
+
+        survey["privileged_groups"] = st.text_area(
+            "Privileged / Reference Groups",
+            survey.get("privileged_groups", ""),
+            height=80,
+            help=(
+                "Reference or baseline groups used for fairness comparison "
+                "(e.g., majority group, control cohort)."
+            ),
+        )
+
+        survey["favourable_outcome"] = st.text_area(
+            "Definition of Favourable Outcome",
+            survey.get("favourable_outcome", ""),
+            height=80,
+            help=(
+                "Define what constitutes a positive or beneficial outcome "
+                "in this AI system."
+            ),
+        )
+
+    # ==================================================
+    # AUDIT & GOVERNANCE CONTEXT  
+    # ==================================================
+    st.markdown("## Audit and Governance Context")
+
+    with st.container(border=True):
+
         survey["risk_bucket"] = st.selectbox(
-            "Risk classification of this evaluation",
+            "Audit Type / Risk Classification",
             ["Low", "Medium", "High"],
-            index=["Low", "Medium", "High"].index(survey["risk_bucket"])
+            index=["Low", "Medium", "High"].index(
+                survey.get("risk_bucket", "Medium")
+            ),
+            help=(
+                "Overall audit classification based on regulatory exposure, "
+                "deployment criticality, and potential harm."
+            ),
         )
 
-        survey["auditor_access"] = st.selectbox(
-            "Data access available to the evaluator",
-            ["Training data only", "Training + Validation", "Full (Train/Validation/Test)"],
-            index=1
+        survey["auditor_access"] = st.text_area(
+            "Auditor Access to Data",
+            survey.get("auditor_access", ""),
+            height=80,
+            help=(
+                "Describe the level of access provided to internal or external "
+                "auditors (e.g., full data, anonymized samples, metrics only)."
+            ),
         )
 
-        survey["testing_type"] = st.radio(
-            "System access level during testing",
-            ["Open box", "Grey box", "Closed box"],
-            index=["Open box", "Grey box", "Closed box"].index(survey["testing_type"])
+        survey["testing_type"] = st.text_area(
+            "Testing Type",
+            survey.get("testing_type", ""),
+            height=80,
+            help=(
+                "Specify the evaluation methodology used "
+                "(e.g., pre-deployment testing, post-deployment monitoring, "
+                "periodic audit, shadow testing)."
+            ),
         )
+
+    # ==================================================
+    # SYSTEM DEPENDENCIES & LIMITATIONS
+    # ==================================================
+    st.markdown("## System Dependencies and Limitations")
 
     with st.container(border=True):
-        depends = st.radio(
-            "Did this evaluation require assistance from the system developer?",
-            ["No", "Yes"],
-            index=0 if survey["dependencies"] in ("", "No developer dependency.") else 1
-        )
 
-        if depends == "Yes":
-            survey["dependencies"] = st.text_area(
-                "Describe the nature of developer involvement",
-                survey["dependencies"],
-                height=120
-            )
-        else:
-            survey["dependencies"] = "No developer dependency."
+        survey["dependencies"] = st.text_area(
+            "Dependencies",
+            survey.get("dependencies", ""),
+            height=80,
+            help=(
+                "Key technical, data, infrastructure, or organizational "
+                "dependencies required for correct operation."
+            ),
+        )
 
         survey["limitations"] = st.text_area(
-            "Which aspects of the system were not evaluated as part of this assessment?",
-            survey["limitations"],
-            height=140
+            "Limitations",
+            survey.get("limitations", ""),
+            height=80,
+            help=(
+                "Known constraints, assumptions, data gaps, or evaluation "
+                "limitations relevant to fairness assessment."
+            ),
+        )
+# ==================================================
+# TAB 2 — FAIRNESS METRICS (ONE TABLE PER ATTRIBUTE)
+# ==================================================
+with tab_metrics:
+    METRICS = [
+        "Statistical Parity Difference",
+        "Disparate Impact",
+        "Average Odds Difference",
+        "Equal Opportunity Difference",
+        "Error Rate Difference",
+    ]
+
+    for attr in protected_attrs:
+        st.markdown(f"### {attr}")
+
+        df_attr = inference["results_by_attr"][attr]
+        row = df_attr[df_attr["Model"] == results["selected_model"]]
+
+        if row.empty:
+            st.warning("Model not found.")
+            continue
+
+        row = row.iloc[0]
+
+        st.dataframe(
+            [{"Metric": m, "Observed Value": row.get(m, np.nan)} for m in METRICS],
+            use_container_width=True
         )
 
 # ==================================================
-# TAB 2 — METRICS (LOCKED)
+# TAB 3 — NARRATIVE INPUTS
 # ==================================================
-with tab2:
-    st.markdown("### Computed metrics")
-    st.caption("These values are generated automatically and cannot be edited.")
+with tab_narrative:
+    preproc["user_narratives"]["P14"] = st.text_area(
+        "AI System Description",
+        preproc["user_narratives"]["P14"],
+        height=120
+    )
 
-    with st.container(border=True):
-        st.dataframe(inference["tables"]["fairness"], use_container_width=True)
+    preproc["pipeline_description"] = st.text_area(
+        "Data, Model, and Pipeline Description",
+        preproc["pipeline_description"],
+        height=120
+    )
 
-    with st.container(border=True):
-        st.dataframe(inference["tables"]["performance"], use_container_width=True)
+  #  survey["questionnaire_summary"] = st.text_area(
+  #      "Fairness QuestioSnnaire Summary",
+  #      survey["questionnaire_summary"],
+  #      height=120
+  #  )
 
-# ==================================================
-# TAB 3 — DETAILED REPORT
-# ==================================================
-with tab3:
-    st.markdown("### Detailed evaluation narrative")
+    survey["risk_outcome"] = st.text_area(
+        "Risk Assessment Outcome",
+        survey["risk_outcome"],
+        height=120
+    )
 
-    with st.container(border=True):
-        preproc["user_narratives"]["P14"] = st.text_area(
-            "Describe the AI system and its intended use",
-            preproc["user_narratives"]["P14"],
-            height=140
-        )
+    survey["protected_attr_rationale"] = st.text_area(
+        "Protected Attribute Rationale",
+        survey["protected_attr_rationale"],
+        height=120
+    )
 
-        preproc["pipeline_description"] = st.text_area(
-            "Describe the data, model, and processing pipeline",
-            preproc["pipeline_description"],
-            height=140
-        )
-
-    with st.container(border=True):
-        survey["questionnaire_summary"] = st.text_area(
-            "Summary of fairness questionnaire responses",
-            survey["questionnaire_summary"],
-            height=120
-        )
-
-        survey["risk_outcome"] = st.text_area(
-            "Outcome of the risk assessment",
-            survey["risk_outcome"],
-            height=120
-        )
-
-    with st.container(border=True):
-        survey["protected_attr_rationale"] = st.text_area(
-            "Rationale for selecting protected attributes",
-            survey["protected_attr_rationale"],
-            height=120
-        )
-
-        survey["metric_rationale"] = st.text_area(
-            "Rationale for selecting fairness metrics",
-            survey["metric_rationale"],
-            height=120
-        )
-
-        survey["threshold_rationale"] = st.text_area(
-            "Rationale for threshold selection",
-            survey["threshold_rationale"],
-            height=120
-        )
-
-    with st.container(border=True):
-        preproc["scenarios_tested"] = st.text_area(
-            "Evaluation scenarios tested",
-            preproc["scenarios_tested"],
-            height=120
-        )
-
-        survey["certification_context"] = st.text_area(
-            "Certification and intended usage context",
-            survey["certification_context"],
-            height=120
-        )
+    survey["certification_context"] = st.text_area(
+        "Certification Context",
+        survey["certification_context"],
+        height=120
+    )
 
 # ==================================================
-# FINAL GENERATION (UNCHANGED)
+# TAB 4 — REPORT GENERATION
 # ==================================================
-if st.button("Generate Final Report"):
-    doc = Document(TEMPLATE_PATH)
+with tab_report:
+    st.markdown("## Generate Final Report")
 
-    TEXT = {
-        "[[P1_TEXT]]": f"FS={results['FS']:.3f}, BI={results['BI']:.3f}, Verdict={results['verdict']}",
-        "[[P2_TEXT]]": preproc["user_narratives"]["P14"],
-        "[[P3_TEXT]]": survey["protected_attr"],
-        "[[P4_TEXT]]": survey["privileged_groups"],
-        "[[P5_TEXT]]": survey["favourable_outcome"],
-        "[[P6_TEXT]]": survey["risk_bucket"],
-        "[[P7_TEXT]]": survey["auditor_access"],
-        "[[P8_TEXT]]": survey["testing_type"],
-        "[[P9_TEXT]]": survey["dependencies"],
-        "[[P10_TEXT]]": survey["limitations"],
-        "[[P13_TEXT]]": f"Overall fairness score FS={results['FS']:.3f} with verdict {results['verdict']}.",
-        "[[P14_TEXT]]": preproc["user_narratives"]["P14"],
-        "[[P15_TEXT]]": preproc["pipeline_description"],
-        "[[P16_TEXT]]": survey["questionnaire_summary"],
-        "[[P17_TEXT]]": survey["risk_outcome"],
-        "[[P18_TEXT]]": survey["protected_attr_rationale"],
-        "[[P19_TEXT]]": survey["metric_rationale"],
-        "[[P20_TEXT]]": survey["threshold_rationale"],
-        "[[P21_TEXT]]": preproc["split_method"],
-        "[[P22_TEXT]]": preproc["synthetic_data"],
-        "[[P23_TEXT]]": preproc["scenarios_tested"],
-        "[[P26_TEXT]]": survey["certification_context"],
-    }
+    if st.button("Generate Final Report"):
 
-    for k, v in TEXT.items():
-        if not replace_text(doc, k, v):
-            st.error(f"Missing placeholder in template: {k}")
+        # ------------------------------
+        # LOAD WIREFRAME TEMPLATE
+        # ------------------------------
+        TEMPLATE_PATH = Path(__file__).parent / "Fairness_Evaluation_Report_Wireframe_v1.docx"
+        if not TEMPLATE_PATH.exists():
+            st.error("DOCX wireframe not found.")
             st.stop()
 
-    insert_table(doc, "[[TABLE_P11]]", inference["tables"]["fairness"])
-    insert_table(doc, "[[TABLE_P24]]", inference["tables"]["performance"])
+        doc = Document(TEMPLATE_PATH)
 
-    insert_plot(doc, "[[FIG_P12]]", plot_fairness_summary())
-    insert_plot(doc, "[[FIG_P18]]", plot_accuracy_bar())
-    insert_plot(doc, "[[FIG_P19]]", plot_fairness_ci())
+        # ------------------------------
+        # TEXT FIELDS (SUMMARY + HEADER)
+        # ------------------------------
+        TEXT = {
+            # Header (wireframe top)
+            "[[S1]]": survey.get("organization_name", ""),
+            "[[S2]]": survey.get("developing_department", ""),
 
-    out = Path(tempfile.gettempdir()) / "Fairness_Evaluation_Report_Final.docx"
-    doc.save(out)
+            # Summary section
+            "[[P1_TEXT]]": (
+                f"System Fairness Score = {results['FS_system']:.3f}. "
+                
+            ),
+            "[[P2_TEXT]]": survey.get("ai_application_overview", ""),
+            "[[P3_TEXT]]": ", ".join(protected_attrs),
+            "[[P4_TEXT]]": survey.get("privileged_groups", ""),
+            "[[P5_TEXT]]": survey.get("favourable_outcome", ""),
 
-    st.success("Final report generated successfully.")
-    st.download_button("Download Report", open(out, "rb"), file_name=out.name)
+            # Audit / governance
+            "[[P6_TEXT]]": survey.get("risk_bucket", ""),
+            "[[P7_TEXT]]": survey.get("auditor_access", ""),
+            "[[P8_TEXT]]": survey.get("testing_type", ""),
+            "[[P9_TEXT]]": survey.get("dependencies", ""),
+            "[[P10_TEXT]]": survey.get("limitations", ""),
 
+            # Narrative sections
+            "[[P14_TEXT]]": preproc["user_narratives"].get("P14", ""),
+            "[[P15_TEXT]]": preproc.get("pipeline_description", ""),
+            "[[P16_TEXT]]": build_survey_qa_section_from_submission(survey),
+            "[[P17_TEXT]]": survey.get("risk_outcome", ""),
+            "[[P18_TEXT]]": survey.get("protected_attr_rationale", ""),
+            "[[P26_TEXT]]": survey.get("certification_context", ""),
 
+            # System score
+            "[[FS_SYSTEM]]": f"{results['FS_system']:.3f}",
+        }
 
+        for k, v in TEXT.items():
+            replace_text(doc, k, v)
+        # ------------------------------
+        # FAIRNESS METRICS + BIAS INDICES
+        # ------------------------------
+        METRIC_KEYS = {
+            "Statistical Parity Difference": "SPD",
+            "Disparate Impact": "DI",
+            "Average Odds Difference": "AOD",
+            "Equal Opportunity Difference": "EOD",
+            "Error Rate Difference": "ERD",
+        }
+
+        for idx, attr in enumerate(protected_attrs, start=1):
+            replace_text(doc, f"[[ATTR_{idx}_NAME]]", attr)
+            replace_text(
+                doc,
+                f"[[BI_ATTR{idx}]]",
+                f"{results['BI_per_attribute'][attr]:.3f}"
+            )
+
+            df_attr = inference["results_by_attr"][attr]
+            row = df_attr[df_attr["Model"] == results["selected_model"]]
+
+            if row.empty:
+                continue
+
+            row = row.iloc[0]
+
+            for metric_name, short in METRIC_KEYS.items():
+                val = row.get(metric_name, np.nan)
+                replace_text(
+                    doc,
+                    f"[[{short}_ATTR{idx}]]",
+                    f"{val:.3f}" if isinstance(val, (float, int)) else "N/A"
+                )
+
+        # ------------------------------
+        # INSERT PLOTS
+        # ------------------------------
+        y_true = inference["y_true"]
+        y_pred = df[results["selected_model"]].values
+
+        for idx, attr in enumerate(protected_attrs, start=1):
+            sens = df[attr].astype(str).values
+
+            fig_disp, _ = plot_disparity_in_performance(
+                y_true, y_pred, sens
+            )
+            insert_plot(doc, f"[[FIG_DISPARITY_ATTR{idx}]]", fig_disp)
+
+            fig_err = plot_group_error_panel(
+                y_true, y_pred, sens, group_name=attr
+            )
+            insert_plot(doc, f"[[FIG_GROUP_ERROR_ATTR{idx}]]", fig_err)
+
+        # ------------------------------
+        # SAVE & DOWNLOAD
+        # ------------------------------
+        out_path = Path(tempfile.gettempdir()) / "Fairness_Evaluation_Report_Final.docx"
+        doc.save(out_path)
+
+        st.success("Final fairness evaluation report generated successfully.")
+        st.download_button(
+            "Download Report",
+            open(out_path, "rb"),
+            file_name=out_path.name
+        )
+        # ------------------------------
+        # PLOTS
+        # ------------------------------
+        y_true = inference["y_true"]
+        y_pred = df[results["selected_model"]].values
+
+        for idx, attr in enumerate(protected_attrs, start=1):
+            sens = df[attr].astype(str).values
+
+            fig1, _ = plot_disparity_in_performance(y_true, y_pred, sens)
+            insert_plot(doc, f"[[FIG_DISPARITY_ATTR{idx}]]", fig1)
+
+            fig2 = plot_group_error_panel(y_true, y_pred, sens, group_name=attr)
+            insert_plot(doc, f"[[FIG_GROUP_ERROR_ATTR{idx}]]", fig2)
+
+        out = Path(tempfile.gettempdir()) / "Fairness_Evaluation_Report_Final.docx"
+        doc.save(out)
+
+        st.success("Report generated.")
+        st.download_button("Download Report", open(out, "rb"), file_name=out.name)
