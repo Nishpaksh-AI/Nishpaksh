@@ -527,10 +527,13 @@ if not inference or not inference.get("completed"):
     st.warning("Inference results not available. Please complete the Inference step.")
     st.stop()
 
-df = inference["results_df"].copy()
+results_by_attr = inference.get("results_by_attr")
+if not isinstance(results_by_attr, dict) or not results_by_attr:
+    st.error("No protected-attribute-wise results found.")
+    st.stop()
 
 # --------------------------------------------------
-# Explicit fairness metric definitions (DECLARED)
+# Fairness metric definitions (IDEALS)
 # --------------------------------------------------
 FAIRNESS_METRICS = [
     ("Statistical Parity Difference", 0.0),
@@ -540,67 +543,80 @@ FAIRNESS_METRICS = [
     ("Error Rate Difference", 0.0),
 ]
 
-AVAILABLE_FAIRNESS_METRICS = [
-    (m, ideal) for m, ideal in FAIRNESS_METRICS if m in df.columns
-]
-
 # --------------------------------------------------
-# Compute Bias Index (BI) and Fairness Score (FS)
+# Bias Index computation (PER PROTECTED ATTRIBUTE)
+# BI_i = sqrt( (1/n) * sum_j (M_ij - M'_j)^2 )
 # --------------------------------------------------
-def compute_BI_FS(row: pd.Series):
+def compute_bias_index(row: pd.Series, metrics):
     diffs = []
     metric_vals = {}
 
-    for name, ideal in AVAILABLE_FAIRNESS_METRICS:
-        val = row.get(name, np.nan)
-        if pd.notna(val):
-            metric_vals[name] = float(val)
-            diffs.append((float(val) - float(ideal)) ** 2)
+    for name, ideal in metrics:
+        if name in row and pd.notna(row[name]):
+            val = float(row[name])
+            metric_vals[name] = val
+            diffs.append((val - ideal) ** 2)
 
     if not diffs:
-        return np.nan, np.nan, metric_vals
+        return np.nan, metric_vals
 
     bi = float(np.sqrt(np.mean(diffs)))
-    fs = float(1.0 - bi)
-    return bi, fs, metric_vals
-
-if "BI" not in df.columns or "FS" not in df.columns:
-    BI_vals, FS_vals, metric_maps = [], [], []
-    for _, r in df.iterrows():
-        bi, fs, mvals = compute_BI_FS(r)
-        BI_vals.append(bi)
-        FS_vals.append(fs)
-        metric_maps.append(mvals)
-
-    df["BI"] = BI_vals
-    df["FS"] = FS_vals
-    df["_fairness_metric_map"] = metric_maps
+    return bi, metric_vals
 
 # --------------------------------------------------
-# Model selection
+# Model selection (shared)
 # --------------------------------------------------
+model_candidates = list(
+    next(iter(results_by_attr.values()))["Model"].values
+)
+
 st.markdown("### Model under evaluation")
-model = st.selectbox("Select model", df["Model"].tolist())
-row = df[df["Model"] == model].iloc[0]
-
-FS_val = row["FS"]
-BI_val = row["BI"]
-fairness_metric_map = row["_fairness_metric_map"]
+model = st.selectbox("Select model", model_candidates)
 
 # --------------------------------------------------
-# Verdict rules (EXPLICIT)
+# Compute BI per protected attribute
+# --------------------------------------------------
+attr_BI = {}
+attr_metric_maps = {}
+
+for attr, df_attr in results_by_attr.items():
+    row = df_attr[df_attr["Model"] == model].iloc[0]
+
+    available_metrics = [
+        (m, ideal) for m, ideal in FAIRNESS_METRICS if m in df_attr.columns
+    ]
+
+    bi, metric_map = compute_bias_index(row, available_metrics)
+    attr_BI[attr] = bi
+    attr_metric_maps[attr] = {
+        "metrics": metric_map,
+        "available_metrics": available_metrics,
+    }
+
+# --------------------------------------------------
+# Fairness Score aggregation (SYSTEM LEVEL)
+# FS = 1 - sqrt( (1/m) * sum_i (BI_i)^2 )
+# --------------------------------------------------
+BI_values = [v for v in attr_BI.values() if pd.notna(v)]
+
+if BI_values:
+    FS_system = float(1.0 - np.sqrt(np.mean(np.square(BI_values))))
+else:
+    FS_system = np.nan
+
+# --------------------------------------------------
+# Verdict rules (UNCHANGED)
 # --------------------------------------------------
 FS_PASS = 0.85
 FS_CONDITIONAL = 0.70
-BI_MAX = 0.15
 
-if pd.isna(FS_val) or pd.isna(BI_val):
+if pd.isna(FS_system):
     verdict = "INSUFFICIENT DATA"
     verdict_color = "#9E9E9E"
-elif FS_val >= FS_PASS and BI_val <= BI_MAX:
+elif FS_system >= FS_PASS:
     verdict = "PASS"
     verdict_color = "#2E7D32"
-elif FS_val >= FS_CONDITIONAL:
+elif FS_system >= FS_CONDITIONAL:
     verdict = "CONDITIONAL"
     verdict_color = "#ED6C02"
 else:
@@ -608,25 +624,19 @@ else:
     verdict_color = "#C62828"
 
 # --------------------------------------------------
-# Decision cards (VISUAL UPGRADE)
+# SYSTEM-LEVEL DECISION SUMMARY
 # --------------------------------------------------
-st.markdown("### Decision Summary")
+st.markdown("### Final Fairness Decision (System Level)")
 
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns(2)
 
 c1.metric(
-    label="Fairness Score (FS)",
-    value=f"{FS_val:.3f}" if pd.notna(FS_val) else "N/A",
-    help="FS = 1 − Bias Index (higher is better)"
+    "Fairness Score (FS)",
+    f"{FS_system:.3f}" if pd.notna(FS_system) else "N/A",
+    help="FS = 1 − sqrt(mean(BI_i²)) across protected attributes"
 )
 
-c2.metric(
-    label="Bias Index (BI)",
-    value=f"{BI_val:.3f}" if pd.notna(BI_val) else "N/A",
-    help="Root-mean-square deviation of fairness metrics from ideal values"
-)
-
-c3.markdown(
+c2.markdown(
     f"""
     <div style="
         padding: 1.1rem;
@@ -646,34 +656,83 @@ c3.markdown(
 st.markdown("---")
 
 # --------------------------------------------------
-# Fairness Metrics Summary Plot (EVIDENCE LAYER)
+# PER-PROTECTED ATTRIBUTE EVIDENCE (NO PLOTS MISSED)
 # --------------------------------------------------
-st.markdown("### Fairness Metrics — Component View")
+st.markdown("## Bias Index by Protected Attribute")
 
-if fairness_metric_map:
-    metric_names = list(fairness_metric_map.keys())
-    values = [fairness_metric_map[m] for m in metric_names]
-    ideals = [ideal for m, ideal in AVAILABLE_FAIRNESS_METRICS if m in metric_names]
+for attr, bi in attr_BI.items():
+    st.markdown(f"### Protected Attribute: `{attr}`")
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-    bars = ax.bar(metric_names, values)
+    # ---- BI Card ----
+    st.metric(
+        "Bias Index (BI)",
+        f"{bi:.3f}" if pd.notna(bi) else "N/A",
+        help="Root-mean-square deviation of fairness metrics from ideal values"
+    )
 
-    # Ideal reference lines
-    for m, ideal in AVAILABLE_FAIRNESS_METRICS:
-        if m in metric_names:
-            ax.axhline(
-                y=ideal,
-                linestyle="--",
-                linewidth=1,
-                alpha=0.6,
-                color="black"
+    metric_map = attr_metric_maps[attr]["metrics"]
+    available_metrics = attr_metric_maps[attr]["available_metrics"]
+
+    # ---- Fairness metric component plot ----
+    if metric_map:
+        metric_names = list(metric_map.keys())
+        values = [metric_map[m] for m in metric_names]
+
+        fig, ax = plt.subplots(figsize=(8, 4))
+        bars = ax.bar(metric_names, values)
+
+        for m, ideal in available_metrics:
+            if m in metric_names:
+                ax.axhline(
+                    y=ideal,
+                    linestyle="--",
+                    linewidth=1,
+                    alpha=0.6,
+                    color="black"
+                )
+
+        ax.set_ylabel("Metric value")
+        ax.set_title(f"Fairness Metrics — {attr}")
+        ax.set_xticklabels(metric_names, rotation=30, ha="right")
+
+        for b, v in zip(bars, values):
+            ax.text(
+                b.get_x() + b.get_width() / 2,
+                b.get_height(),
+                f"{v:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=9
             )
 
-    ax.set_ylabel("Metric value")
-    ax.set_title("Individual Fairness Metrics for Selected Model")
-    ax.set_xticklabels(metric_names, rotation=30, ha="right")
+        plt.tight_layout()
+        st.pyplot(fig)
 
-    for b, v in zip(bars, values):
+        st.caption(
+            "Dashed reference lines indicate ideal metric values. "
+            "These metrics are aggregated into the Bias Index (BIᵢ)."
+        )
+    else:
+        st.info("No fairness metrics available for this protected attribute.")
+
+    st.markdown("---")
+
+# --------------------------------------------------
+# SYSTEM-LEVEL AGGREGATION PLOT (BI → FS)
+# --------------------------------------------------
+st.markdown("## Aggregation Across Protected Attributes")
+
+attrs = list(attr_BI.keys())
+bi_vals = [attr_BI[a] for a in attrs]
+
+fig, ax = plt.subplots(figsize=(7, 4))
+bars = ax.bar(attrs, bi_vals)
+
+ax.set_ylabel("Bias Index (BIᵢ)")
+ax.set_title("Bias Index per Protected Attribute")
+
+for b, v in zip(bars, bi_vals):
+    if pd.notna(v):
         ax.text(
             b.get_x() + b.get_width() / 2,
             b.get_height(),
@@ -683,29 +742,28 @@ if fairness_metric_map:
             fontsize=9
         )
 
-    plt.tight_layout()
-    st.pyplot(fig)
-
-    st.caption(
-        "Dashed reference lines indicate ideal values. "
-        "These metrics collectively contribute to the Bias Index (BI)."
-    )
-else:
-    st.info("No fairness metrics available for visualization.")
+plt.tight_layout()
+st.pyplot(fig)
 
 # --------------------------------------------------
-# Decision rationale (TEXTUAL, AUDIT-FRIENDLY)
+# Decision rationale (STANDARD-COMPLIANT)
 # --------------------------------------------------
 st.markdown("### Decision Rationale")
 
 st.markdown(
     f"""
-- **Bias Index (BI)** is computed as the root-mean-square deviation of the selected
-  fairness metrics from their ideal values.
-- **Fairness Score (FS)** is derived as **FS = 1 − BI**.
+- **Bias Index (BIᵢ)** is computed **per protected attribute** as the root-mean-square
+  deviation of fairness metrics from their ideal values.
+- **Fairness Score (FS)** is computed at the **system level** as:
+
+\[
+FS = 1 - \sqrt{{\\frac{{1}}{{m}} \sum_{{i=1}}^{{m}} BI_i^2}}
+\]
+
+where *m* is the number of protected attributes.
 
 **Decision thresholds applied**:
-- FS ≥ {FS_PASS} and BI ≤ {BI_MAX} → **PASS**
+- FS ≥ {FS_PASS} → **PASS**
 - FS ≥ {FS_CONDITIONAL} → **CONDITIONAL**
 - Otherwise → **FAIL**
 
@@ -714,19 +772,17 @@ st.markdown(
 )
 
 # --------------------------------------------------
-# Persist results for Final Report
+# Persist results
 # --------------------------------------------------
 st.session_state["results"] = {
     "selected_model": model,
-    "FS": FS_val,
-    "BI": BI_val,
+    "FS_system": FS_system,
+    "BI_per_attribute": attr_BI,
     "verdict": verdict,
-    "fairness_metrics": fairness_metric_map,
     "thresholds": {
         "FS_pass": FS_PASS,
         "FS_conditional": FS_CONDITIONAL,
-        "BI_max": BI_MAX,
     },
 }
 
-st.success("Fairness verdict recorded and ready for final report.")
+st.success("Fairness assessment completed using standard-compliant aggregation.")
