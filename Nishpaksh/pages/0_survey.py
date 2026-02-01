@@ -3,6 +3,10 @@ Survey page — INPUT ONLY (governance risk assessment)
 
 Responsibilities:
 - Render governance / audit survey using utils.survey.render_survey()
+
+
+Hard rules:
+- No DOCX / PDF generation
 - No filesystem writes
 - No report logic
 """
@@ -685,4 +689,3 @@ st.caption(
     "✔ Survey results are locked and stored for downstream reporting. "
     "To modify responses, reset the session."
 )
-
