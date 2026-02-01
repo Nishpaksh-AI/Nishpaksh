@@ -1,5 +1,5 @@
 # pages/3_Inference.py
-# Inference & Fairness Evaluation 
+# Inference & Fairness Evaluation — STORY-DRIVEN + CONTRACT-SAFE
 
 import streamlit as st
 import pandas as pd
@@ -537,27 +537,46 @@ st.markdown(
 )
 
 # --------------------------------------------------
-# Preconditions
+# Preconditions (flat authoritative keys)
 # --------------------------------------------------
 data = st.session_state.get("uploaded_data")
-label_col = st.session_state.get("ground_truth_col")
-sensitive_col = st.session_state.get("sensitive_col")
-privileged_value = st.session_state.get("privileged_value")
+ground_truth = st.session_state.get("ground_truth")
+num_protected = st.session_state.get("num_protected_attrs")
 
 if not isinstance(data, pd.DataFrame) or data.empty:
     st.warning("No dataset available. Complete earlier steps first.")
     st.stop()
 
-if None in (label_col, sensitive_col, privileged_value):
-    st.error("Ground truth, sensitive attribute, and privileged group must be set.")
+if not isinstance(ground_truth, str) or ground_truth == "":
+    st.error("Ground truth must be set on the Home page.")
     st.stop()
+
+if not isinstance(num_protected, int) or num_protected < 1:
+    st.error("Protected attributes not configured on Home page.")
+    st.stop()
+
+# --------------------------------------------------
+# Reconstruct protected attributes
+# --------------------------------------------------
+protected_attrs = []
+for i in range(1, num_protected + 1):
+    attr = st.session_state.get(f"protected_attribute_{i}")
+    priv = st.session_state.get(f"privileged_class_{i}")
+
+    if not isinstance(attr, str) or not isinstance(priv, str):
+        st.error(f"Protected attribute {i} is not fully configured.")
+        st.stop()
+
+    protected_attrs.append(
+        {"attribute": attr, "privileged_class": priv}
+    )
 
 # --------------------------------------------------
 # Detect prediction columns
 # --------------------------------------------------
 pred_cols = [
     c for c in data.columns
-    if c not in {label_col, sensitive_col}
+    if c != ground_truth
     and set(pd.Series(data[c]).dropna().unique()).issubset({0, 1})
 ]
 
@@ -566,7 +585,7 @@ if not pred_cols:
     st.stop()
 
 # --------------------------------------------------
-# Positive class selectors (UNCHANGED)
+# Positive class selectors
 # --------------------------------------------------
 def _guess_positive(vals):
     for v in vals:
@@ -574,7 +593,7 @@ def _guess_positive(vals):
             return v
     return sorted(vals)[-1]
 
-label_vals = data[label_col].astype(str).unique().tolist()
+label_vals = data[ground_truth].astype(str).unique().tolist()
 pred_vals = sorted({str(v) for c in pred_cols for v in data[c].dropna().unique()})
 
 c1, c2 = st.columns(2)
@@ -590,13 +609,14 @@ POS_PRED = c2.selectbox(
 )
 
 # --------------------------------------------------
-# Deterministic computation fingerprint
+# Deterministic compute key
 # --------------------------------------------------
 def make_compute_key():
     h = hashlib.sha256()
-    h.update(str(label_col).encode())
-    h.update(str(sensitive_col).encode())
-    h.update(str(privileged_value).encode())
+    h.update(str(ground_truth).encode())
+    for p in protected_attrs:
+        h.update(p["attribute"].encode())
+        h.update(p["privileged_class"].encode())
     h.update(str(POS_TRUE).encode())
     h.update(str(POS_PRED).encode())
     h.update(",".join(pred_cols).encode())
@@ -606,128 +626,89 @@ def make_compute_key():
 compute_key = make_compute_key()
 
 # --------------------------------------------------
-# Heavy computation (PURE FUNCTION, NO CACHE)
+# Heavy computation (multi-sensitive)
 # --------------------------------------------------
-def compute_all_metrics(
-    df, label_col, sensitive_col, pred_cols,
-    privileged_value, pos_true, pos_pred, B=20
+def compute_all_metrics_multi_sensitive(
+    df, label_col, pred_cols, protected_attrs, pos_true, pos_pred, B=20
 ):
+    results_by_attr = {}
+    bootstrap_by_attr = {}
+
     y_true = _as01(df[label_col].values, positive=pos_true)
-    sens_arr = df[sensitive_col].astype(str).values
 
-    rows = []
-    fairness_bootstrap = {}
+    for p in protected_attrs:
+        sens_col = p["attribute"]
+        priv_val = p["privileged_class"]
+        sens_arr = df[sens_col].astype(str).values
 
-    for col in pred_cols:
-        y_pred = _as01(df[col].values, positive=pos_pred)
+        rows = []
+        fairness_bootstrap = {}
 
-        perf = GroupMetrics(y_true, y_pred).get_all()
-        fair = FairnessMetrics(
-            y_true, y_pred, sens_arr,
-            privileged_value=privileged_value
-        ).get_all()
+        for col in pred_cols:
+            y_pred = _as01(df[col].values, positive=pos_pred)
 
-        rows.append({"Model": col, **perf, **fair})
+            perf = GroupMetrics(y_true, y_pred).get_all()
+            fair = FairnessMetrics(
+                y_true, y_pred, sens_arr,
+                privileged_value=priv_val
+            ).get_all()
 
-        for m in fair.keys():
-            fairness_bootstrap.setdefault(m, {})[col] = []
-            for _ in range(B):
-                idx = np.random.choice(len(y_true), len(y_true), replace=True)
-                fb = FairnessMetrics(
-                    y_true[idx], y_pred[idx], sens_arr[idx],
-                    privileged_value=privileged_value
-                ).get_all()
-                fairness_bootstrap[m][col].append(fb.get(m))
+            rows.append({"Model": col, **perf, **fair})
 
-    return pd.DataFrame(rows), fairness_bootstrap, y_true, sens_arr
+            for m in fair:
+                fairness_bootstrap.setdefault(m, {})[col] = []
+                for _ in range(B):
+                    idx = np.random.choice(len(y_true), len(y_true), replace=True)
+                    fb = FairnessMetrics(
+                        y_true[idx],
+                        y_pred[idx],
+                        sens_arr[idx],
+                        privileged_value=priv_val,
+                    ).get_all()
+                    fairness_bootstrap[m][col].append(fb[m])
+
+        results_by_attr[sens_col] = pd.DataFrame(rows)
+        bootstrap_by_attr[sens_col] = fairness_bootstrap
+
+    return results_by_attr, bootstrap_by_attr, y_true
 
 # --------------------------------------------------
-# Compute trigger (ARCHITECTURALLY FIXED)
+# Compute trigger
 # --------------------------------------------------
 if st.button("Compute metrics"):
     with st.spinner("Computing metrics…"):
-        results_df, fairness_bootstrap, y_true, sens_arr = compute_all_metrics(
-            data, label_col, sensitive_col, pred_cols,
-            privileged_value, POS_TRUE, POS_PRED
+        results_by_attr, bootstrap_by_attr, y_true = compute_all_metrics_multi_sensitive(
+            data,
+            ground_truth,
+            pred_cols,
+            protected_attrs,
+            POS_TRUE,
+            POS_PRED,
         )
 
-        def safe_table(df, cols):
-            keep = [c for c in cols if c in df.columns]
-            return df[["Model"] + keep]
-
-        PERFORMANCE_COLS = [
-            "TP", "TN", "FP", "FN",
-            "Accuracy", "TPR (Recall)", "TNR",
-            "FPR", "FNR", "Precision (PPV)",
-            "NPV", "FDR", "FOR", "F1"
-        ]
-
-        FAIRNESS_COLS = [
-            "Statistical Parity Difference",
-            "Disparate Impact",
-            "Average Odds Difference",
-            "Error Rate Difference",
-            "Equal Opportunity Difference",
-            "Equalized Odds",
-            "Thiel Index",
-        ]
-
-        # 🔒 CONTRACT PRESERVED
         st.session_state["inference"] = {
             "completed": True,
             "compute_key": compute_key,
-            "results_df": results_df,
-            "fairness_bootstrap": fairness_bootstrap,
+            "results_by_attr": results_by_attr,
+            "bootstrap_by_attr": bootstrap_by_attr,
             "y_true": y_true,
-            "sensitive_attr": sens_arr,
-            "positive_class": {
-                "ground_truth": POS_TRUE,
-                "prediction": POS_PRED,
-            },
-            "tables": {
-                "performance": safe_table(results_df, PERFORMANCE_COLS),
-                "fairness": safe_table(results_df, FAIRNESS_COLS),
-            },
         }
-
         st.session_state["metrics_ready"] = True
 
-# --------------------------------------------------
-# Guard: freeze UI until computed
-# --------------------------------------------------
 if not st.session_state.get("metrics_ready"):
     st.stop()
 
-# --------------------------------------------------
-# Unpack (READ-ONLY, SAFE)
-# --------------------------------------------------
 inference = st.session_state["inference"]
-
-# Recompute protection
-if inference.get("compute_key") != compute_key:
+if inference["compute_key"] != compute_key:
     st.warning("Inputs changed. Please recompute metrics.")
     st.stop()
 
-results_df = inference["results_df"]
-fairness_bootstrap = inference["fairness_bootstrap"]
+results_by_attr = inference["results_by_attr"]
+bootstrap_by_attr = inference["bootstrap_by_attr"]
 y_true = inference["y_true"]
-sens_arr = inference["sensitive_attr"]
-
-AVAILABLE_FAIRNESS_METRICS = [
-    c for c in [
-        "Statistical Parity Difference",
-        "Disparate Impact",
-        "Average Odds Difference",
-        "Error Rate Difference",
-        "Equal Opportunity Difference",
-        "Equalized Odds",
-        "Thiel Index",
-    ]
-    if c in results_df.columns
-]
 
 # --------------------------------------------------
-# Sidebar navigation (UNCHANGED)
+# Subpage navigation (UNCHANGED STRUCTURE)
 # --------------------------------------------------
 subpage = st.sidebar.radio(
     "Inference & Fairness Story",
@@ -741,87 +722,111 @@ subpage = st.sidebar.radio(
 )
 
 # ==================================================
-# 1️⃣ Model Readiness
+# 1. Model Readiness
 # ==================================================
 if subpage == " Model Readiness":
-    st.dataframe(inference["tables"]["performance"].set_index("Model"), use_container_width=True)
-    st.pyplot(plot_bar_single_metric(results_df, "Accuracy"))
-    st.pyplot(plot_line_single_metric(results_df, "Accuracy"))
+    for sens_col, df_res in results_by_attr.items():
+        st.markdown(f"## Model Readiness — `{sens_col}`")
+        st.dataframe(df_res.set_index("Model"), use_container_width=True)
+        st.pyplot(plot_bar_single_metric(df_res, "Accuracy"))
 
 # ==================================================
-# 2️⃣ Outcome Distribution & Parity
+# 2. Outcome Distribution & Parity
 # ==================================================
 elif subpage == " Outcome Distribution & Parity":
-    st.dataframe(inference["tables"]["fairness"].set_index("Model"), use_container_width=True)
+    for sens_col, df_res in results_by_attr.items():
+        st.markdown(f"## Outcome Distribution & Parity — `{sens_col}`")
 
-    metric = st.selectbox("Outcome fairness metric", AVAILABLE_FAIRNESS_METRICS)
-    st.pyplot(plot_bar_single_metric(results_df, metric))
-
-    model = st.selectbox("Model for group outcomes", pred_cols)
-    group_df = (
-        pd.DataFrame({
-            sensitive_col: sens_arr,
-            "selection_rate": _as01(data[model].values, POS_PRED),
-        })
-        .groupby(sensitive_col, as_index=False)
-        .mean()
-    )
-
-    st.pyplot(
-        plot_by_group_bars(
-            group_df,
-            sensitive_col=sensitive_col,
-            value_col="selection_rate",
-            title="Selection Rate by Group",
+        metric = st.selectbox(
+            f"Fairness metric ({sens_col})",
+            [
+                c for c in df_res.columns
+                if c in [
+                    "Statistical Parity Difference",
+                    "Disparate Impact",
+                    "Average Odds Difference",
+                    "Error Rate Difference",
+                    "Equal Opportunity Difference",
+                ]
+            ],
+            key=f"parity_{sens_col}",
         )
-    )
+
+        st.pyplot(plot_bar_single_metric(df_res, metric))
 
 # ==================================================
-# 3️⃣ Error Disparities
+# 3. Error Disparities
 # ==================================================
 elif subpage == " Error Disparities":
-    model = st.selectbox("Model", pred_cols)
+    for sens_col in results_by_attr:
+        st.markdown(f"## Error Disparities — `{sens_col}`")
 
-    fig, stats = plot_disparity_in_performance(
-        y_true, data[model].values, sens_arr,
-        positive_true=POS_TRUE, positive_pred=POS_PRED
-    )
-    st.pyplot(fig)
-    st.dataframe(stats["per_group"])
-
-    st.pyplot(
-        plot_group_error_panel(
-            y_true, data[model].values, sens_arr,
-            group_name=sensitive_col,
-            positive_true=POS_TRUE, positive_pred=POS_PRED
+        model = st.selectbox(
+            f"Model ({sens_col})",
+            pred_cols,
+            key=f"err_model_{sens_col}",
         )
-    )
+
+        sens_arr = data[sens_col].astype(str).values
+
+        fig, stats = plot_disparity_in_performance(
+            y_true,
+            data[model].values,
+            sens_arr,
+            positive_true=POS_TRUE,
+            positive_pred=POS_PRED,
+        )
+        st.pyplot(fig)
+        st.dataframe(stats["per_group"])
+
+        st.pyplot(
+            plot_group_error_panel(
+                y_true,
+                data[model].values,
+                sens_arr,
+                group_name=sens_col,
+                positive_true=POS_TRUE,
+                positive_pred=POS_PRED,
+            )
+        )
 
 # ==================================================
-# 4️⃣ Fairness–Performance Tradeoffs
+# 4. Fairness–Performance Tradeoffs
 # ==================================================
 elif subpage == " Fairness–Performance Tradeoffs":
+
+    # Use the first sensitive attribute's results as representative
+    df_res = next(iter(results_by_attr.values()))
+
+    st.markdown("## Fairness–Performance Trade-offs")
+
+    fairness_metric = st.selectbox(
+        "Fairness metric",
+        [c for c in df_res.columns if c not in ["Model", "Accuracy"]],
+        key="trade_fair_global",
+    )
+
+    performance_metric = st.selectbox(
+        "Performance metric",
+        ["Accuracy", "TPR (Recall)", "FPR", "FNR"],
+        key="trade_perf_global",
+    )
+
     st.pyplot(
         plot_fairness_accuracy_scatter(
-            results_df,
-            fairness_metric=st.selectbox("Fairness metric", AVAILABLE_FAIRNESS_METRICS),
-            performance_metric=st.selectbox(
-                "Performance metric", ["Accuracy", "TPR (Recall)", "FPR", "FNR"]
-            ),
+            df_res,
+            fairness_metric=fairness_metric,
+            performance_metric=performance_metric,
         )
     )
 
 # ==================================================
-# 5️⃣ Model Comparison & Risk Summary
+# 5. Model Comparison & Risk Summary (REMOVED PLOTS)
 # ==================================================
 elif subpage == " Model Comparison & Risk Summary":
-    st.pyplot(plot_fairness_error_bars(fairness_bootstrap))
+    for sens_col, df_res in results_by_attr.items():
+        st.markdown(f"## Model Comparison & Risk Summary — `{sens_col}`")
 
-    heatmap_df = results_df.set_index("Model")[AVAILABLE_FAIRNESS_METRICS]
-    st.pyplot(plot_models_groups_heatmap(heatmap_df))
+        st.pyplot(plot_fairness_error_bars(bootstrap_by_attr[sens_col]))
 
-    st.dataframe(
-        inference["tables"]["fairness"].set_index("Model"),
-        use_container_width=True
-    )
-
+        st.dataframe(df_res.set_index("Model"), use_container_width=True)
