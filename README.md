@@ -4,6 +4,18 @@
 
 The framework is compliant with the **TEC (Telecommunication Engineering Centre) Standard for Fairness Assessment and Rating of Artificial Intelligence Systems**, which presently covers **supervised learning models using tabular data**. It enables systematic documentation of model behavior, limitations, and fairness rationale, supporting transparent and accountable decision-making in regulated AI deployments.
 
+
+Guideline to run the app :
+
+1.Clone the repository and navigate to the project root directory.
+
+2. Ensure all required dependencies are installed (see requirements.txt).
+
+3. Run the Streamlit application using the command below:
+
+   "streamlit run Home.py"
+
+
 🔗 **TEC Standard (official document):**  
 [Standard for Fairness Assessment and Rating of Artificial Intelligence Systems (TEC)](https://www.tec.gov.in/pdf/SDs/TEC%20Standard%20for%20fairness%20assessment%20and%20rating%20of%20AI%20systems%20Final%20v5%202023_07_04.pdf)
 
