@@ -1,14 +1,13 @@
 """
-Survey page — INPUT ONLY (governance risk assessment)
+Survey page — 
 
 Responsibilities:
 - Render governance / audit survey using utils.survey.render_survey()
 
 
-Hard rules:
+
 - No DOCX / PDF generation
 - No filesystem writes
-- No report logic
 """
 
 import streamlit as st
@@ -669,7 +668,7 @@ st.caption(
 )
 
 # --------------------------------------------------
-# Preview: Proxy Risk Drivers (Ephemeral)
+# Preview: Proxy Risk Drivers
 # --------------------------------------------------
 plot_data = st.session_state.get("survey_plot_data")
 
