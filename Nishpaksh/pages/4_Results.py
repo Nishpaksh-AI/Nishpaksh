@@ -626,7 +626,7 @@ else:
 # --------------------------------------------------
 # SYSTEM-LEVEL DECISION SUMMARY
 # --------------------------------------------------
-st.markdown("### Final Fairness Decision (System Level)")
+st.markdown("### Aggregated Fairness score")
 
 c1, c2 = st.columns(2)
 
@@ -636,22 +636,22 @@ c1.metric(
     help="FS = 1 − sqrt(mean(BI_i²)) across protected attributes"
 )
 
-c2.markdown(
-    f"""
-    <div style="
-        padding: 1.1rem;
-        border-radius: 0.75rem;
-        background-color: {verdict_color};
-        color: white;
-        text-align: center;
-        font-size: 1.4rem;
-        font-weight: 700;
-    ">
-        {verdict}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+#c2.markdown(
+#    f"""
+#    <div style="
+#        padding: 1.1rem;
+#        border-radius: 0.75rem;
+#        background-color: {verdict_color};
+#        color: white;
+#        text-align: center;
+#        font-size: 1.4rem;
+#        font-weight: 700;
+#    ">
+#        {verdict}
+#    </div>
+#    """,
+#    unsafe_allow_html=True
+#)
 
 st.markdown("---")
 
@@ -757,17 +757,17 @@ st.markdown(
 - **Fairness Score (FS)** is computed at the **system level** as:
 
 \[
-FS = 1 - \sqrt{{\\frac{{1}}{{m}} \sum_{{i=1}}^{{m}} BI_i^2}}
+Fairness Score (FS) = 1 − √( average of squared Bias Indices across all protected attributes )
 \]
 
-where *m* is the number of protected attributes.
+
 
 **Decision thresholds applied**:
-- FS ≥ {FS_PASS} → **PASS**
-- FS ≥ {FS_CONDITIONAL} → **CONDITIONAL**
-- Otherwise → **FAIL**
+- FS ≥ {FS_PASS} → **Model is fair**
+- FS ≥ {FS_CONDITIONAL} → **Slightly more unfairness, but acceptable**
+- Otherwise → **Model is unfair**
 
-**Final verdict for `{model}`**: **{verdict}**
+
 """
 )
 
