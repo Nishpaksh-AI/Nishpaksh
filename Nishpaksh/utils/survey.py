@@ -776,7 +776,7 @@ def render_survey(embedded: bool = True, require_identity: bool = True) -> Optio
                 del st.session_state["responses_temp"]
             if "survey_page" in st.session_state:
                 st.session_state["survey_page"] = list(SURVEY_SECTIONS.keys())[0]
-            st.experimental_rerun()
+            st.rerun()
 
     current_page = st.session_state.get("survey_page", list(SURVEY_SECTIONS.keys())[0])
 
@@ -816,17 +816,17 @@ def render_survey(embedded: bool = True, require_identity: bool = True) -> Optio
             if idx > 0:
                 if st.button("Previous Section"):
                     st.session_state["survey_page"] = sections[idx - 1]
-                    st.experimental_rerun()
+                    st.rerun()
         with cols[1]:
             st.write(f"Section {idx + 1} of {len(sections)}")
         with cols[2]:
             if idx < len(sections) - 1:
                 if st.button("Next Section"):
                     st.session_state["survey_page"] = sections[idx + 1]
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 if st.button("Go to Summary"):
                     st.session_state["survey_page"] = "Summary"
-                    st.experimental_rerun()
+                    st.rerun()
 
     return None
