@@ -7,7 +7,7 @@ import pandas as pd
 st.set_page_config(page_title="Nishpaksh", layout="centered")
 
 # ==================================================
-# DESIGN ONLY (NO LOGIC TOUCHING)
+# DESIGN ONLY 
 # ==================================================
 st.markdown(
     """
@@ -111,38 +111,16 @@ st.markdown(
 )
 
 # ==================================================
-# BRANDING (UNCHANGED)
+# BRANDING - Top Left Nishpaksh Logo
 # ==================================================
-LOGO_WIDTH = 300
-tec_paths = ["tec.png", "tec.jpg", "assets/tec.png", "assets/tec.jpg"]
-iiitd_paths = ["iiitd.png", "iiitd.jpg", "assets/iiitd.png", "assets/iiitd.jpg"]
-meity_paths = ["meity.png", "meity.jpg", "assets/meity.png", "assets/meity.jpg"]
+nishpaksh_paths = ["nishpaksh_logo.jpg", "nishpaksh_logo.png", "assets/nishpaksh_logo.jpg", "assets/nishpaksh_logo.png"]
 
-col_l, col_c, col_r = st.columns([1, 1, 1])
-
-with col_l:
-    for p in tec_paths:
-        try:
-            st.image(p, width=LOGO_WIDTH)
-            break
-        except Exception:
-            pass
-
-with col_c:
-    for p in iiitd_paths:
-        try:
-            st.image(p, width=LOGO_WIDTH)
-            break
-        except Exception:
-            pass
-
-with col_r:
-    for p in meity_paths:
-        try:
-            st.image(p, width=LOGO_WIDTH)
-            break
-        except Exception:
-            pass
+for p in nishpaksh_paths:
+    try:
+        st.image(p, use_container_width =True)
+        break
+    except Exception:
+        pass
 
 # ==================================================
 # ------------------ APP LOGIC ------------------
@@ -339,3 +317,39 @@ if config_complete:
     st.sidebar.success("Configuration complete")
 else:
     st.sidebar.warning("Complete configuration on Home page")
+
+# --------------------------------------------------
+# Partner Logos in Sidebar
+# --------------------------------------------------
+st.sidebar.markdown("---")
+
+LOGO_WIDTH = 70
+tec_paths = ["tec.png", "tec.jpg", "assets/tec.png", "assets/tec.jpg"]
+iiitd_paths = ["iiitd.png", "iiitd.jpg", "assets/iiitd.png", "assets/iiitd.jpg"]
+meity_paths = ["meity.png", "meity.jpg", "assets/meity.png", "assets/meity.jpg"]
+
+col1, col2, col3 = st.sidebar.columns(3)
+
+with col1:
+    for p in tec_paths:
+        try:
+            st.image(p, use_container_width =True)
+            break
+        except Exception:
+            pass
+
+with col2:
+    for p in iiitd_paths:
+        try:
+            st.image(p, use_container_width =True)
+            break
+        except Exception:
+            pass
+
+with col3:
+    for p in meity_paths:
+        try:
+            st.image(p,use_container_width =True)
+            break
+        except Exception:
+            pass
