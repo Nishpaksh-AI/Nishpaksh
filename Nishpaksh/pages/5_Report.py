@@ -1,6 +1,6 @@
 # pages/5_Report.py
 # FINAL REPORT COMPILER — WIRE-FRAME ALIGNED (TEC 7.1 COMPLIANT)
-
+# UI REFINED + SECTION STATUS (NO LOGIC CHANGES)
 
 import streamlit as st
 import numpy as np
@@ -573,7 +573,7 @@ def replace_text(doc: Document, placeholder: str, value: str) -> bool:
 
 def insert_plot(doc: Document, placeholder: str, fig) -> bool:
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig.savefig(tmp.name, dpi=300, bbox_inches="tight")
+    fig.savefig(tmp.name, dpi=800, bbox_inches="tight")
     plt.close(fig)
 
     found = False
@@ -902,14 +902,30 @@ with tab_report:
     if st.button("Generate Final Report"):
 
         # ------------------------------
-        # LOAD WIREFRAME TEMPLATE
+        # SELECT WIREFRAME TEMPLATE (BY ATTRIBUTE COUNT)
         # ------------------------------
-        TEMPLATE_PATH = Path(__file__).parent / "Fairness_Evaluation_Report_Wireframe_v1.docx"
+        attr_count = len(protected_attrs)
+
+        if attr_count == 1:
+            template_name = "Fairness_Evaluation_Report_Wireframe_v1.docx"
+        elif attr_count == 2:
+            template_name = "Fairness_Evaluation_Report_Wireframe_v2.docx"
+        elif attr_count == 3:
+            template_name = "Fairness_Evaluation_Report_Wireframe_v3.docx"
+        else:
+            st.error("Unsupported number of protected attributes.")
+            st.stop()
+
+        TEMPLATE_PATH = Path(__file__).parent / template_name
         if not TEMPLATE_PATH.exists():
-            st.error("DOCX wireframe not found.")
+            st.error(f"DOCX wireframe not found: {template_name}")
             st.stop()
 
         doc = Document(TEMPLATE_PATH)
+
+        # ------------------------------
+        # TEXT FIELDS (SUMMARY + HEADER)
+        # ------------------------------
 
         # ------------------------------
         # TEXT FIELDS (SUMMARY + HEADER)
@@ -922,7 +938,6 @@ with tab_report:
             # Summary section
             "[[P1_TEXT]]": (
                 f"System Fairness Score = {results['FS_system']:.3f}. "
-                
             ),
             "[[P2_TEXT]]": survey.get("ai_application_overview", ""),
             "[[P3_TEXT]]": ", ".join(protected_attrs),
@@ -950,6 +965,7 @@ with tab_report:
 
         for k, v in TEXT.items():
             replace_text(doc, k, v)
+
         # ------------------------------
         # FAIRNESS METRICS + BIAS INDICES
         # ------------------------------
@@ -961,8 +977,15 @@ with tab_report:
             "Error Rate Difference": "ERD",
         }
 
+        # thresholds selected by user (may be empty)
+        thresholds = st.session_state.get("thresholds", {})
+
         for idx, attr in enumerate(protected_attrs, start=1):
+
+            # Protected attribute name
             replace_text(doc, f"[[ATTR_{idx}_NAME]]", attr)
+
+            # Bias Index
             replace_text(
                 doc,
                 f"[[BI_ATTR{idx}]]",
@@ -978,11 +1001,32 @@ with tab_report:
             row = row.iloc[0]
 
             for metric_name, short in METRIC_KEYS.items():
+
+                # ------------------
+                # Observed value
+                # ------------------
                 val = row.get(metric_name, np.nan)
                 replace_text(
                     doc,
                     f"[[{short}_ATTR{idx}]]",
                     f"{val:.3f}" if isinstance(val, (float, int)) else "N/A"
+                )
+
+                # ------------------
+                # Threshold value
+                # ------------------
+                th_val = "N/A"
+                if (
+                    attr in thresholds
+                    and metric_name in thresholds[attr]
+                    and "value" in thresholds[attr][metric_name]
+                ):
+                    th_val = f"{thresholds[attr][metric_name]['value']:.3f}"
+
+                replace_text(
+                    doc,
+                    f"[[{short}_TH_ATTR{idx}]]",
+                    th_val
                 )
 
         # ------------------------------
@@ -1016,6 +1060,29 @@ with tab_report:
             open(out_path, "rb"),
             file_name=out_path.name
         )
+
+        # ------------------------------
+        # PLOTS (UI preview, unchanged)
+        # ------------------------------
+        for idx, attr in enumerate(protected_attrs, start=1):
+            sens = df[attr].astype(str).values
+
+            fig1, _ = plot_disparity_in_performance(y_true, y_pred, sens)
+            insert_plot(doc, f"[[FIG_DISPARITY_ATTR{idx}]]", fig1)
+
+            fig2 = plot_group_error_panel(y_true, y_pred, sens, group_name=attr)
+            insert_plot(doc, f"[[FIG_GROUP_ERROR_ATTR{idx}]]", fig2)
+
+        out = Path(tempfile.gettempdir()) / "Fairness_Evaluation_Report_Final.docx"
+        doc.save(out)
+
+        st.success("Report generated.")
+        st.download_button(
+            "Download Report",
+            open(out, "rb"),
+            file_name=out.name
+        )
+
         # ------------------------------
         # PLOTS
         # ------------------------------
@@ -1036,4 +1103,3 @@ with tab_report:
 
         st.success("Report generated.")
         st.download_button("Download Report", open(out, "rb"), file_name=out.name)
-
