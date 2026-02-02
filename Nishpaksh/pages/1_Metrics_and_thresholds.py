@@ -1,18 +1,18 @@
 # pages/4_Metrics_and_Thresholds.py
 """
-Standalone Metrics & Thresholds page (improved UX)
+
 - User selects problem type (classification/regression/clustering/recommendation)
 - Metrics selection is a checkbox grid (with Select all / Clear selection)
 - Threshold numeric inputs appear inline when a metric is checked
 - Optional notes removed (per request)
-- Thresholds saved to st.session_state['thresholds'] but not applied in Results (standalone)
+- Thresholds saved to st.session_state['thresholds'] 
 """
 
 import streamlit as st
 import pandas as pd
 import math
 
-st.set_page_config(layout="centered", page_title="Metrics & Thresholds")
+st.set_page_config(layout="wide", page_title="Metrics & Thresholds")
 
 st.title("Model type and group fairness metrics")
 
@@ -292,11 +292,14 @@ st.markdown(
     div[data-testid="stRadio"] > div,
     div[data-testid="stCheckbox"] > div {
         background: var(--bg-section) !important;
-        padding: 1rem !important;
+        padding: 1.25rem 1.5rem !important;
         border-radius: 8px !important;
         border: 1px solid var(--border) !important;
         margin-bottom: 0.5rem !important;
         transition: all 0.2s ease !important;
+        width: 100% !important;              
+        box-sizing: border-box !important;   
+
     }
 
     div[data-testid="stRadio"] > div:hover,
@@ -711,9 +714,9 @@ if "thresholds" not in st.session_state:
     st.session_state["thresholds"] = {}
 
 # --------------------------------------------------
-# Metric selection PER protected attribute
+# Metric selection PER protected attribute (ZOOM-SAFE)
 # --------------------------------------------------
-for idx, p in enumerate(protected_attrs):
+for p in protected_attrs:
     attr = p["attribute"]
 
     st.markdown(f"## Metrics & thresholds for **{attr}**")
@@ -721,65 +724,85 @@ for idx, p in enumerate(protected_attrs):
     if attr not in st.session_state["thresholds"]:
         st.session_state["thresholds"][attr] = {}
 
-    saved_thresholds = st.session_state["thresholds"][attr]
+    attr_thresholds = st.session_state["thresholds"][attr]
 
     sel_key = f"metric_selection_{attr}"
     prob_key = f"_metric_problem_{attr}"
 
     if sel_key not in st.session_state or st.session_state.get(prob_key) != problem:
-        st.session_state[sel_key] = {
-            m: (m in saved_thresholds or True) for m in GROUP_METRICS
-        }
+        st.session_state[sel_key] = {m: True for m in GROUP_METRICS}
         st.session_state[prob_key] = problem
 
-    # --------------------------------------------------
-    # Select / clear buttons
-    # --------------------------------------------------
-    c1, c2, _ = st.columns([1, 1, 6])
-    with c1:
-        if st.button("Select all", key=f"select_all_{attr}"):
+    # -------------------------------
+    # Select / Clear buttons (2-col)
+    # -------------------------------
+    b1, b2 = st.columns(2)
+
+    with b1:
+        if st.button(
+            "Select all",
+            key=f"select_all_{attr}",
+            use_container_width=True,
+        ):
             for m in GROUP_METRICS:
                 st.session_state[sel_key][m] = True
 
-    with c2:
-        if st.button("Clear all", key=f"clear_all_{attr}"):
+    with b2:
+        if st.button(
+            "Clear all",
+            key=f"clear_all_{attr}",
+            use_container_width=True,
+        ):
             for m in GROUP_METRICS:
                 st.session_state[sel_key][m] = False
+            attr_thresholds.clear()
 
     st.markdown("### Choose fairness metrics")
 
-    cols = st.columns(2)
-    for i, m in enumerate(GROUP_METRICS):
-        col = cols[i % 2]
+    # -------------------------------
+    # Metrics grid (2 × 3, HARD SAFE)
+    # Each metric in its OWN container
+    # -------------------------------
+    col_left, col_right = st.columns(2, gap="large")
+    metric_cols = [col_left, col_right]
 
-        chk_key = f"chk_{attr}_{problem}_{m}"
-        checked = col.checkbox(
-            m,
-            value=st.session_state[sel_key].get(m, True),
-            key=chk_key,
-        )
+    for idx_m, metric in enumerate(GROUP_METRICS):
+        target_col = metric_cols[idx_m // 3]
 
-        st.session_state[sel_key][m] = checked
+        with target_col:
+            with st.container():  # 🔒 CRITICAL: isolates CSS
+                chk_key = f"chk_{attr}_{problem}_{metric}"
+                th_key = f"th_{attr}_{problem}_{metric}"
 
-        if checked:
-            th_key = f"th_{attr}_{problem}_{m}"
+                checked = st.checkbox(
+                    metric,
+                    value=st.session_state[sel_key].get(metric, True),
+                    key=chk_key,
+                )
 
-            init_val = saved_thresholds.get(
-                m, {}
-            ).get("value", DEFAULTS[m])
+                st.session_state[sel_key][metric] = checked
 
-            val = col.number_input(
-                f"Threshold for {m}",
-                value=float(init_val),
-                step=0.01,
-                format="%.4f",
-                key=th_key,
-            )
+                if checked:
+                    if metric not in attr_thresholds:
+                        attr_thresholds[metric] = {
+                            "value": DEFAULTS[metric],
+                            "problem": problem,
+                        }
 
-            st.session_state["thresholds"][attr][m] = {
-                "value": float(val),
-                "problem": problem,
-            }
+                    val = st.number_input(
+                        "Threshold",
+                        value=float(attr_thresholds[metric]["value"]),
+                        step=0.01,
+                        format="%.4f",
+                        key=th_key,
+                    )
+
+                    attr_thresholds[metric] = {
+                        "value": float(val),
+                        "problem": problem,
+                    }
+                else:
+                    attr_thresholds.pop(metric, None)
 
     st.markdown("---")
 
