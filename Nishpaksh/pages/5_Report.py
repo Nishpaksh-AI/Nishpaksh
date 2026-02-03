@@ -22,517 +22,151 @@ from utils.viz_utils import (
 # ==================================================
 st.set_page_config(layout="wide")
 st.title("Final Fairness Evaluation Report")
+
 st.markdown(
     """
     <style>
-    /* ======================================================
-       IMPORTS & ROOT VARIABLES
-       ====================================================== */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    :root {
-        --primary: #2563eb;
-        --primary-dark: #1e40af;
-        --primary-light: #3b82f6;
-        --accent: #0ea5e9;
-        --success: #10b981;
-        --warning: #f59e0b;
-        --danger: #ef4444;
-        
-        --bg-app: #f8fafc;
-        --bg-card: #ffffff;
-        --bg-section: #f1f5f9;
-        --bg-hover: #e0f2fe;
-        
-        --border: #e2e8f0;
-        --border-strong: #cbd5e1;
-        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        
-        --text-primary: #0f172a;
-        --text-secondary: #475569;
-        --text-muted: #64748b;
-        --text-light: #94a3b8;
-    }
-
-    /* ======================================================
-       GLOBAL BASE
-       ====================================================== */
-    * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-    }
-
+    /* Import font */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    /* Base typography */
     .stApp {
-        background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
-        color: var(--text-primary);
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
     }
-
-    html, body {
-        font-size: 16px;
-        line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-    }
-
-    /* ======================================================
-       TYPOGRAPHY
-       ====================================================== */
-    h1 {
-        font-size: 2.5rem !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.025em !important;
-        margin-bottom: 0.5rem !important;
-        color: var(--text-primary) !important;
-        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+    
+    /* Gradient headings */
+    h1, h2, h3 {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        background-clip: text;
+        font-weight: 800 !important;
+        letter-spacing: -0.02em;
     }
-
-    h1::after {
-        content: "";
-        display: block;
-        width: 80px;
-        height: 4px;
-        background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
-        margin-top: 12px;
-        border-radius: 2px;
-        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
-    }
-
-    h2 {
-        font-size: 1.75rem !important;
-        font-weight: 700 !important;
-        margin-top: 2.5rem !important;
-        margin-bottom: 1rem !important;
-        color: var(--text-primary) !important;
-        padding-left: 1rem !important;
-        border-left: 5px solid var(--primary) !important;
-        background: linear-gradient(90deg, rgba(37, 99, 235, 0.05) 0%, transparent 100%);
-        padding: 0.75rem 0 0.75rem 1rem !important;
-        border-radius: 0 8px 8px 0;
-    }
-
-    h3 {
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        margin-bottom: 0.75rem !important;
-    }
-
-    p, .stMarkdown p {
-        color: var(--text-secondary) !important;
-        font-size: 1rem !important;
-        line-height: 1.7 !important;
-        max-width: 75ch;
-    }
-
-    .stCaption {
-        color: var(--text-muted) !important;
-        font-size: 0.9rem !important;
-    }
-
-    /* ======================================================
-       SURVEY NAVIGATION SIDEBAR
-       ====================================================== */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(button) {
-        background: var(--bg-card) !important;
-        border: 2px solid var(--border) !important;
+    
+    /* Navigation sidebar - boxed style */
+    [data-testid="stSidebarNav"] {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
-        padding: 1.5rem !important;
-        margin-bottom: 1.5rem !important;
-        box-shadow: var(--shadow-md) !important;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"] h3 {
-        font-size: 1.1rem !important;
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        margin-bottom: 1rem !important;
-        padding-bottom: 0.75rem !important;
-        border-bottom: 2px solid var(--border) !important;
-    }
-
-    /* Navigation buttons */
-    div[data-testid="stVerticalBlockBorderWrapper"] button {
-        width: 100% !important;
-        text-align: left !important;
-        padding: 0.75rem 1rem !important;
-        margin-bottom: 0.5rem !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 8px !important;
-        background: var(--bg-section) !important;
-        color: var(--text-secondary) !important;
-        font-size: 0.95rem !important;
-        font-weight: 500 !important;
-        transition: all 0.2s ease !important;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"] button:hover {
-        background: var(--bg-hover) !important;
-        border-color: var(--primary) !important;
-        color: var(--primary) !important;
-        transform: translateX(4px);
-        box-shadow: var(--shadow-sm) !important;
-    }
-
-    /* ======================================================
-       MAIN CONTENT CARDS
-       ====================================================== */
-    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: var(--bg-card) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 16px !important;
-        padding: 2rem !important;
-        margin-bottom: 1.5rem !important;
-        box-shadow: var(--shadow-md) !important;
-        transition: all 0.3s ease;
-    }
-
-    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        box-shadow: var(--shadow-lg) !important;
-        border-color: var(--border-strong) !important;
-    }
-
-    /* ======================================================
-       SURVEY QUESTIONS (EXPANDERS) - KEY IMPROVEMENTS
-       ====================================================== */
-    div[data-testid="stExpander"] {
-        margin-bottom: 1.25rem !important;
-        border-radius: 12px !important;
-        overflow: hidden;
-        box-shadow: var(--shadow-sm) !important;
-        transition: all 0.3s ease;
-    }
-
-    div[data-testid="stExpander"]:hover {
-        box-shadow: var(--shadow-md) !important;
-    }
-
-    /* Question headers */
-    div[data-testid="stExpander"] > details > summary {
-        font-size: 1.05rem !important;
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
-        padding: 1.25rem 1.5rem !important;
-        border-radius: 12px !important;
-        border: 2px solid var(--border) !important;
-        border-left: 6px solid var(--primary) !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        line-height: 1.6 !important;
-        min-height: 60px;
-        display: flex;
-        align-items: center;
-    }
-
-    div[data-testid="stExpander"] > details > summary:hover {
-        background: linear-gradient(135deg, var(--bg-hover) 0%, #e0f2fe 100%) !important;
-        border-left-color: var(--accent) !important;
-        transform: translateX(4px);
-        box-shadow: var(--shadow-sm) !important;
-    }
-
-    div[data-testid="stExpander"] > details[open] > summary {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-        color: white !important;
-        border-color: var(--primary-dark) !important;
-        border-left-color: var(--accent) !important;
-        border-radius: 12px 12px 0 0 !important;
-    }
-
-    /* Question content area */
-    div[data-testid="stExpander"] > details > div {
-        background-color: var(--bg-card) !important;
-        padding: 1.5rem 1.75rem !important;
-        border-left: 6px solid var(--border-strong) !important;
-        border-right: 2px solid var(--border) !important;
-        border-bottom: 2px solid var(--border) !important;
-        border-radius: 0 0 12px 12px !important;
-        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
-    }
-
-    /* ======================================================
-       FORM INPUTS & CONTROLS
-       ====================================================== */
-    label {
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        font-size: 0.95rem !important;
-        margin-bottom: 0.5rem !important;
-        display: block !important;
-    }
-
-    /* Text inputs and textareas */
-    textarea, 
-    input[type="text"],
-    input[type="number"] {
-        font-size: 1rem !important;
-        line-height: 1.6 !important;
-        border-radius: 8px !important;
-        padding: 0.75rem 1rem !important;
-        border: 2px solid var(--border) !important;
-        background: var(--bg-card) !important;
-        color: var(--text-primary) !important;
-        transition: all 0.2s ease !important;
-        width: 100% !important;
-    }
-
-    textarea:focus,
-    input[type="text"]:focus,
-    input[type="number"]:focus {
-        border-color: var(--primary) !important;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
-        outline: none !important;
-    }
-
-    /* Radio buttons and checkboxes */
-    div[data-testid="stRadio"] > div,
-    div[data-testid="stCheckbox"] > div {
-        background: var(--bg-section) !important;
         padding: 1rem !important;
+        margin: 1rem 0.5rem !important;
+    }
+    
+    [data-testid="stSidebarNav"] a {
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 8px !important;
-        border: 1px solid var(--border) !important;
+        padding: 0.75rem 1rem !important;
         margin-bottom: 0.5rem !important;
         transition: all 0.2s ease !important;
     }
-
-    div[data-testid="stRadio"] > div:hover,
-    div[data-testid="stCheckbox"] > div:hover {
-        background: var(--bg-hover) !important;
-        border-color: var(--primary) !important;
+    
+    [data-testid="stSidebarNav"] a:hover {
+        border-color: #60a5fa !important;
+        background-color: rgba(96, 165, 250, 0.1) !important;
+        transform: translateX(4px);
     }
-
-    /* Radio button labels */
-    div[data-testid="stRadio"] label {
-        font-weight: 500 !important;
-        font-size: 0.95rem !important;
-        padding: 0.5rem 0 !important;
+    
+    [data-testid="stSidebarNav"] a[aria-current="page"] {
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+        border-color: transparent !important;
     }
-
-    /* ======================================================
-       BUTTONS
-       ====================================================== */
-    button[kind="primary"] {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-        color: white !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-        border-radius: 10px !important;
-        padding: 0.875rem 2rem !important;
-        border: none !important;
-        box-shadow: var(--shadow-md) !important;
-        transition: all 0.3s ease !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    button[kind="primary"]:hover {
-        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%) !important;
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg) !important;
-    }
-
-    button[kind="secondary"] {
-        background: var(--bg-card) !important;
-        color: var(--text-primary) !important;
-        border: 2px solid var(--border) !important;
-        font-weight: 600 !important;
-        border-radius: 10px !important;
-        padding: 0.875rem 2rem !important;
-        transition: all 0.2s ease !important;
-    }
-
-    button[kind="secondary"]:hover {
-        border-color: var(--primary) !important;
-        color: var(--primary) !important;
-        background: var(--bg-hover) !important;
-    }
-
-    /* ======================================================
-       METRICS & INFO BOXES
-       ====================================================== */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-section) 100%) !important;
+    
+    /* Content cards - smaller padding */
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 16px !important;
         padding: 1.5rem !important;
+        margin-bottom: 1rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    /* Radio button containers */
+    div[data-testid="stRadio"] > div {
+        background-color: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
-        border: 2px solid var(--border) !important;
-        box-shadow: var(--shadow-md) !important;
+        padding: 1rem !important;
     }
-
-    div[data-testid="stMetric"] label {
-        font-size: 0.9rem !important;
-        font-weight: 600 !important;
-        color: var(--text-secondary) !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        font-size: 2.5rem !important;
-        font-weight: 700 !important;
-        color: var(--primary) !important;
-    }
-
-    /* Info/Success/Warning boxes */
-    div[data-testid="stAlert"] {
-        border-radius: 12px !important;
+    
+    /* Primary buttons */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
         border: none !important;
-        box-shadow: var(--shadow-sm) !important;
-        padding: 1.25rem 1.5rem !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="info"] {
-        background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%) !important;
-        border-left: 5px solid var(--accent) !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="success"] {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%) !important;
-        border-left: 5px solid var(--success) !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="warning"] {
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
-        border-left: 5px solid var(--warning) !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="error"] {
-        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%) !important;
-        border-left: 5px solid var(--danger) !important;
-    }
-
-    /* ======================================================
-       SIDEBAR
-       ====================================================== */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-        border-right: 2px solid var(--border) !important;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-    }
-
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        color: var(--text-primary) !important;
-        padding-left: 0.5rem !important;
-    }
-
-    section[data-testid="stSidebar"] li {
         border-radius: 8px !important;
-        margin-bottom: 0.25rem !important;
-        transition: all 0.2s ease !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 700 !important;
+    }
+    
+    /* File uploader */
+    div[data-testid="stFileUploader"] {
+        border-radius: 12px !important;
+        padding: 1.5rem !important;
+    }
+    
+    /* Metrics */
+    div[data-testid="stMetric"] {
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    /* Logo positioning */
+    .nishpaksh-logo {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        width: 120px;
+        z-index: 9999;
+    }
+    
+    [data-testid="stSidebarNav"] {
+        margin-top: 120px;
     }
 
-    section[data-testid="stSidebar"] li:has(a[aria-current="page"]) {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-        box-shadow: var(--shadow-sm) !important;
+    /* ===============================
+   Boxed & symmetric tabs
+   =============================== */
+   div[data-testid="stTabs"] {
+    padding: 0.25rem 0.25rem 0.75rem 0.25rem;
     }
 
-    section[data-testid="stSidebar"] li:has(a[aria-current="page"]) a {
-        color: white !important;
-        font-weight: 600 !important;
+    div[data-testid="stTabs"] button {
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 10px !important;
+    padding: 0.6rem 1.1rem !important;
+    margin-right: 0.5rem !important;
+    font-weight: 600 !important;
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    transition: all 0.2s ease-in-out;
     }
 
-    section[data-testid="stSidebar"] li:hover {
-        background: var(--bg-hover) !important;
+    /* Active tab */
+    div[data-testid="stTabs"] button[aria-selected="true"] {
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+    color: white !important;
+    border-color: transparent !important;
     }
 
-    /* ======================================================
-       PROGRESS & INDICATORS
-       ====================================================== */
-    .stProgress > div > div {
-        background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%) !important;
-        border-radius: 10px !important;
-        height: 8px !important;
+    /* Hover */
+    div[data-testid="stTabs"] button:hover {
+    border-color: #60a5fa !important;
+    background-color: rgba(96, 165, 250, 0.12) !important;
     }
 
-    /* ======================================================
-       DIVIDERS
-       ====================================================== */
-    hr {
-        border: none !important;
-        border-top: 2px solid var(--border) !important;
-        margin: 2.5rem 0 !important;
-        opacity: 0.6;
-    }
-
-    /* ======================================================
-       SCROLLBAR STYLING
-       ====================================================== */
+    
+    /* Scrollbar */
     ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
+        width: 8px;
+        height: 8px;
     }
-
-    ::-webkit-scrollbar-track {
-        background: var(--bg-section);
-        border-radius: 10px;
-    }
-
+    
     ::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, var(--primary) 0%, var(--accent) 100%);
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
         border-radius: 10px;
-        border: 2px solid var(--bg-section);
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, var(--primary-dark) 0%, var(--primary) 100%);
-    }
-
-    /* ======================================================
-       RESPONSIVE IMPROVEMENTS
-       ====================================================== */
-    @media (max-width: 768px) {
-        h1 {
-            font-size: 2rem !important;
-        }
-        
-        h2 {
-            font-size: 1.5rem !important;
-        }
-        
-        div[data-testid="stExpander"] > details > summary {
-            font-size: 0.95rem !important;
-            padding: 1rem 1.25rem !important;
-        }
-    }
-
-    /* ======================================================
-       ANIMATIONS
-       ====================================================== */
-    @keyframes slideIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    div[data-testid="stVerticalBlock"] > div {
-        animation: slideIn 0.3s ease-out;
-    }
-
-    /* ======================================================
-       FOCUS STATES
-       ====================================================== */
-    button:focus-visible,
-    input:focus-visible,
-    textarea:focus-visible {
-        outline: 3px solid rgba(37, 99, 235, 0.5) !important;
-        outline-offset: 2px !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
-
-
 
 # ==================================================
 # IMPORTS REQUIRED FOR THIS PAGE LOGIC
@@ -857,42 +491,56 @@ with tab_metrics:
 # TAB 3 — NARRATIVE INPUTS
 # ==================================================
 with tab_narrative:
+
     preproc["user_narratives"]["P14"] = st.text_area(
         "AI System Description",
         preproc["user_narratives"]["P14"],
-        height=120
+        height=120,
+        help=(
+            "Provide a concise but complete description of the AI system, "
+            "including its purpose, deployment context, users, and decision impact."
+        ),
     )
 
     preproc["pipeline_description"] = st.text_area(
         "Data, Model, and Pipeline Description",
         preproc["pipeline_description"],
-        height=120
+        height=120,
+        help=(
+            "Describe the data sources, preprocessing steps, model type(s), "
+            "training procedure, and end-to-end inference pipeline."
+        ),
     )
-
-  #  survey["questionnaire_summary"] = st.text_area(
-  #      "Fairness QuestioSnnaire Summary",
-  #      survey["questionnaire_summary"],
-  #      height=120
-  #  )
 
     survey["risk_outcome"] = st.text_area(
         "Risk Assessment Outcome",
         survey["risk_outcome"],
-        height=120
+        height=120,
+        help=(
+            "Summarize the key risks identified during the fairness assessment "
+            "and their overall severity."
+        ),
     )
 
     survey["protected_attr_rationale"] = st.text_area(
         "Protected Attribute Rationale",
         survey["protected_attr_rationale"],
-        height=120
+        height=120,
+        help=(
+            "Explain why the selected protected attributes are relevant for this "
+            "use case from a legal, ethical, or societal perspective."
+        ),
     )
 
     survey["certification_context"] = st.text_area(
         "Certification Context",
         survey["certification_context"],
-        height=120
+        height=120,
+        help=(
+            "Specify whether this assessment supports regulatory compliance, "
+            "internal audit, external certification, or governance reporting."
+        ),
     )
-
 # ==================================================
 # TAB 4 — REPORT GENERATION
 # ==================================================
