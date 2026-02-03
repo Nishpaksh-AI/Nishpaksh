@@ -8,517 +8,125 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
 st.title("Results — Fairness Assessment & Verdict")
+
 st.markdown(
     """
     <style>
-    /* ======================================================
-       IMPORTS & ROOT VARIABLES
-       ====================================================== */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    :root {
-        --primary: #2563eb;
-        --primary-dark: #1e40af;
-        --primary-light: #3b82f6;
-        --accent: #0ea5e9;
-        --success: #10b981;
-        --warning: #f59e0b;
-        --danger: #ef4444;
-        
-        --bg-app: #f8fafc;
-        --bg-card: #ffffff;
-        --bg-section: #f1f5f9;
-        --bg-hover: #e0f2fe;
-        
-        --border: #e2e8f0;
-        --border-strong: #cbd5e1;
-        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        
-        --text-primary: #0f172a;
-        --text-secondary: #475569;
-        --text-muted: #64748b;
-        --text-light: #94a3b8;
-    }
-
-    /* ======================================================
-       GLOBAL BASE
-       ====================================================== */
-    * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-    }
-
+    /* Import font */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    /* Base typography */
     .stApp {
-        background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
-        color: var(--text-primary);
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
     }
+    
+    /* Gradient headings */
+    h1 code, h2 code, h3 code {
+    -webkit-text-fill-color: initial !important;
+    background: none !important;
+    color: #2563eb !important;   /* readable blue */
+    font-weight: 700;
+     }
 
-    html, body {
-        font-size: 16px;
-        line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-    }
-
-    /* ======================================================
-       TYPOGRAPHY
-       ====================================================== */
-    h1 {
-        font-size: 2.5rem !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.025em !important;
-        margin-bottom: 0.5rem !important;
-        color: var(--text-primary) !important;
-        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    h1::after {
-        content: "";
-        display: block;
-        width: 80px;
-        height: 4px;
-        background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
-        margin-top: 12px;
-        border-radius: 2px;
-        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
-    }
-
-    h2 {
-        font-size: 1.75rem !important;
-        font-weight: 700 !important;
-        margin-top: 2.5rem !important;
-        margin-bottom: 1rem !important;
-        color: var(--text-primary) !important;
-        padding-left: 1rem !important;
-        border-left: 5px solid var(--primary) !important;
-        background: linear-gradient(90deg, rgba(37, 99, 235, 0.05) 0%, transparent 100%);
-        padding: 0.75rem 0 0.75rem 1rem !important;
-        border-radius: 0 8px 8px 0;
-    }
-
-    h3 {
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        margin-bottom: 0.75rem !important;
-    }
-
-    p, .stMarkdown p {
-        color: var(--text-secondary) !important;
-        font-size: 1rem !important;
-        line-height: 1.7 !important;
-        max-width: 75ch;
-    }
-
-    .stCaption {
-        color: var(--text-muted) !important;
-        font-size: 0.9rem !important;
-    }
-
-    /* ======================================================
-       SURVEY NAVIGATION SIDEBAR
-       ====================================================== */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(button) {
-        background: var(--bg-card) !important;
-        border: 2px solid var(--border) !important;
+    
+    /* Navigation sidebar - boxed style */
+    [data-testid="stSidebarNav"] {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
-        padding: 1.5rem !important;
-        margin-bottom: 1.5rem !important;
-        box-shadow: var(--shadow-md) !important;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"] h3 {
-        font-size: 1.1rem !important;
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        margin-bottom: 1rem !important;
-        padding-bottom: 0.75rem !important;
-        border-bottom: 2px solid var(--border) !important;
-    }
-
-    /* Navigation buttons */
-    div[data-testid="stVerticalBlockBorderWrapper"] button {
-        width: 100% !important;
-        text-align: left !important;
-        padding: 0.75rem 1rem !important;
-        margin-bottom: 0.5rem !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 8px !important;
-        background: var(--bg-section) !important;
-        color: var(--text-secondary) !important;
-        font-size: 0.95rem !important;
-        font-weight: 500 !important;
-        transition: all 0.2s ease !important;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"] button:hover {
-        background: var(--bg-hover) !important;
-        border-color: var(--primary) !important;
-        color: var(--primary) !important;
-        transform: translateX(4px);
-        box-shadow: var(--shadow-sm) !important;
-    }
-
-    /* ======================================================
-       MAIN CONTENT CARDS
-       ====================================================== */
-    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: var(--bg-card) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 16px !important;
-        padding: 2rem !important;
-        margin-bottom: 1.5rem !important;
-        box-shadow: var(--shadow-md) !important;
-        transition: all 0.3s ease;
-    }
-
-    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        box-shadow: var(--shadow-lg) !important;
-        border-color: var(--border-strong) !important;
-    }
-
-    /* ======================================================
-       SURVEY QUESTIONS (EXPANDERS) - KEY IMPROVEMENTS
-       ====================================================== */
-    div[data-testid="stExpander"] {
-        margin-bottom: 1.25rem !important;
-        border-radius: 12px !important;
-        overflow: hidden;
-        box-shadow: var(--shadow-sm) !important;
-        transition: all 0.3s ease;
-    }
-
-    div[data-testid="stExpander"]:hover {
-        box-shadow: var(--shadow-md) !important;
-    }
-
-    /* Question headers */
-    div[data-testid="stExpander"] > details > summary {
-        font-size: 1.05rem !important;
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
-        padding: 1.25rem 1.5rem !important;
-        border-radius: 12px !important;
-        border: 2px solid var(--border) !important;
-        border-left: 6px solid var(--primary) !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        line-height: 1.6 !important;
-        min-height: 60px;
-        display: flex;
-        align-items: center;
-    }
-
-    div[data-testid="stExpander"] > details > summary:hover {
-        background: linear-gradient(135deg, var(--bg-hover) 0%, #e0f2fe 100%) !important;
-        border-left-color: var(--accent) !important;
-        transform: translateX(4px);
-        box-shadow: var(--shadow-sm) !important;
-    }
-
-    div[data-testid="stExpander"] > details[open] > summary {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-        color: white !important;
-        border-color: var(--primary-dark) !important;
-        border-left-color: var(--accent) !important;
-        border-radius: 12px 12px 0 0 !important;
-    }
-
-    /* Question content area */
-    div[data-testid="stExpander"] > details > div {
-        background-color: var(--bg-card) !important;
-        padding: 1.5rem 1.75rem !important;
-        border-left: 6px solid var(--border-strong) !important;
-        border-right: 2px solid var(--border) !important;
-        border-bottom: 2px solid var(--border) !important;
-        border-radius: 0 0 12px 12px !important;
-        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
-    }
-
-    /* ======================================================
-       FORM INPUTS & CONTROLS
-       ====================================================== */
-    label {
-        font-weight: 600 !important;
-        color: var(--text-primary) !important;
-        font-size: 0.95rem !important;
-        margin-bottom: 0.5rem !important;
-        display: block !important;
-    }
-
-    /* Text inputs and textareas */
-    textarea, 
-    input[type="text"],
-    input[type="number"] {
-        font-size: 1rem !important;
-        line-height: 1.6 !important;
-        border-radius: 8px !important;
-        padding: 0.75rem 1rem !important;
-        border: 2px solid var(--border) !important;
-        background: var(--bg-card) !important;
-        color: var(--text-primary) !important;
-        transition: all 0.2s ease !important;
-        width: 100% !important;
-    }
-
-    textarea:focus,
-    input[type="text"]:focus,
-    input[type="number"]:focus {
-        border-color: var(--primary) !important;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
-        outline: none !important;
-    }
-
-    /* Radio buttons and checkboxes */
-    div[data-testid="stRadio"] > div,
-    div[data-testid="stCheckbox"] > div {
-        background: var(--bg-section) !important;
         padding: 1rem !important;
+        margin: 1rem 0.5rem !important;
+    }
+    
+    [data-testid="stSidebarNav"] a {
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 8px !important;
-        border: 1px solid var(--border) !important;
+        padding: 0.75rem 1rem !important;
         margin-bottom: 0.5rem !important;
         transition: all 0.2s ease !important;
     }
-
-    div[data-testid="stRadio"] > div:hover,
-    div[data-testid="stCheckbox"] > div:hover {
-        background: var(--bg-hover) !important;
-        border-color: var(--primary) !important;
+    
+    [data-testid="stSidebarNav"] a:hover {
+        border-color: #60a5fa !important;
+        background-color: rgba(96, 165, 250, 0.1) !important;
+        transform: translateX(4px);
     }
-
-    /* Radio button labels */
-    div[data-testid="stRadio"] label {
-        font-weight: 500 !important;
-        font-size: 0.95rem !important;
-        padding: 0.5rem 0 !important;
+    
+    [data-testid="stSidebarNav"] a[aria-current="page"] {
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+        border-color: transparent !important;
     }
-
-    /* ======================================================
-       BUTTONS
-       ====================================================== */
-    button[kind="primary"] {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-        color: white !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-        border-radius: 10px !important;
-        padding: 0.875rem 2rem !important;
-        border: none !important;
-        box-shadow: var(--shadow-md) !important;
-        transition: all 0.3s ease !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    button[kind="primary"]:hover {
-        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%) !important;
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg) !important;
-    }
-
-    button[kind="secondary"] {
-        background: var(--bg-card) !important;
-        color: var(--text-primary) !important;
-        border: 2px solid var(--border) !important;
-        font-weight: 600 !important;
-        border-radius: 10px !important;
-        padding: 0.875rem 2rem !important;
-        transition: all 0.2s ease !important;
-    }
-
-    button[kind="secondary"]:hover {
-        border-color: var(--primary) !important;
-        color: var(--primary) !important;
-        background: var(--bg-hover) !important;
-    }
-
-    /* ======================================================
-       METRICS & INFO BOXES
-       ====================================================== */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-section) 100%) !important;
+    
+    /* Content cards - smaller padding */
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 16px !important;
         padding: 1.5rem !important;
+        margin-bottom: 1rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    /* Radio button containers */
+    div[data-testid="stRadio"] > div {
+        background-color: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
-        border: 2px solid var(--border) !important;
-        box-shadow: var(--shadow-md) !important;
+        padding: 1rem !important;
     }
-
-    div[data-testid="stMetric"] label {
-        font-size: 0.9rem !important;
-        font-weight: 600 !important;
-        color: var(--text-secondary) !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        font-size: 2.5rem !important;
-        font-weight: 700 !important;
-        color: var(--primary) !important;
-    }
-
-    /* Info/Success/Warning boxes */
-    div[data-testid="stAlert"] {
-        border-radius: 12px !important;
+    
+    /* Primary buttons */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
         border: none !important;
-        box-shadow: var(--shadow-sm) !important;
-        padding: 1.25rem 1.5rem !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="info"] {
-        background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%) !important;
-        border-left: 5px solid var(--accent) !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="success"] {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%) !important;
-        border-left: 5px solid var(--success) !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="warning"] {
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
-        border-left: 5px solid var(--warning) !important;
-    }
-
-    div[data-testid="stAlert"][data-baseweb="notification"][kind="error"] {
-        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%) !important;
-        border-left: 5px solid var(--danger) !important;
-    }
-
-    /* ======================================================
-       SIDEBAR
-       ====================================================== */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-        border-right: 2px solid var(--border) !important;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-    }
-
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        color: var(--text-primary) !important;
-        padding-left: 0.5rem !important;
-    }
-
-    section[data-testid="stSidebar"] li {
         border-radius: 8px !important;
-        margin-bottom: 0.25rem !important;
-        transition: all 0.2s ease !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 700 !important;
     }
-
-    section[data-testid="stSidebar"] li:has(a[aria-current="page"]) {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-        box-shadow: var(--shadow-sm) !important;
+    
+    /* File uploader */
+    div[data-testid="stFileUploader"] {
+        border-radius: 12px !important;
+        padding: 1.5rem !important;
     }
-
-    section[data-testid="stSidebar"] li:has(a[aria-current="page"]) a {
-        color: white !important;
-        font-weight: 600 !important;
+    
+    /* Metrics */
+    div[data-testid="stMetric"] {
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
-
-    section[data-testid="stSidebar"] li:hover {
-        background: var(--bg-hover) !important;
+    
+    /* Logo positioning */
+    .nishpaksh-logo {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        width: 120px;
+        z-index: 9999;
     }
-
-    /* ======================================================
-       PROGRESS & INDICATORS
-       ====================================================== */
-    .stProgress > div > div {
-        background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%) !important;
-        border-radius: 10px !important;
-        height: 8px !important;
+    
+    [data-testid="stSidebarNav"] {
+        margin-top: 120px;
     }
-
-    /* ======================================================
-       DIVIDERS
-       ====================================================== */
-    hr {
-        border: none !important;
-        border-top: 2px solid var(--border) !important;
-        margin: 2.5rem 0 !important;
-        opacity: 0.6;
+    
+    /* Push main content down to avoid logo overlap */
+    section[data-testid="stMain"] > div:first-child {
+        padding-top: 3rem !important;
     }
-
-    /* ======================================================
-       SCROLLBAR STYLING
-       ====================================================== */
+    
+    /* Scrollbar */
     ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
+        width: 8px;
+        height: 8px;
     }
-
-    ::-webkit-scrollbar-track {
-        background: var(--bg-section);
-        border-radius: 10px;
-    }
-
+    
     ::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, var(--primary) 0%, var(--accent) 100%);
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
         border-radius: 10px;
-        border: 2px solid var(--bg-section);
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, var(--primary-dark) 0%, var(--primary) 100%);
-    }
-
-    /* ======================================================
-       RESPONSIVE IMPROVEMENTS
-       ====================================================== */
-    @media (max-width: 768px) {
-        h1 {
-            font-size: 2rem !important;
-        }
-        
-        h2 {
-            font-size: 1.5rem !important;
-        }
-        
-        div[data-testid="stExpander"] > details > summary {
-            font-size: 0.95rem !important;
-            padding: 1rem 1.25rem !important;
-        }
-    }
-
-    /* ======================================================
-       ANIMATIONS
-       ====================================================== */
-    @keyframes slideIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    div[data-testid="stVerticalBlock"] > div {
-        animation: slideIn 0.3s ease-out;
-    }
-
-    /* ======================================================
-       FOCUS STATES
-       ====================================================== */
-    button:focus-visible,
-    input:focus-visible,
-    textarea:focus-visible {
-        outline: 3px solid rgba(37, 99, 235, 0.5) !important;
-        outline-offset: 2px !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
-
-
 # --------------------------------------------------
 # Preconditions
 # --------------------------------------------------
@@ -533,15 +141,23 @@ if not isinstance(results_by_attr, dict) or not results_by_attr:
     st.stop()
 
 # --------------------------------------------------
-# Fairness metric definitions (IDEALS)
+# Get selected metrics from session state (configured in Metrics & Thresholds page)
 # --------------------------------------------------
-FAIRNESS_METRICS = [
-    ("Statistical Parity Difference", 0.0),
-    ("Disparate Impact", 1.0),
-    ("Average Odds Difference", 0.0),
-    ("Equal Opportunity Difference", 0.0),
-    ("Error Rate Difference", 0.0),
-]
+selected_thresholds = st.session_state.get("thresholds", {})
+
+if not selected_thresholds:
+    st.warning("No metrics have been selected. Please configure metrics on the 'Metrics and Thresholds' page.")
+    st.stop()
+
+# Map metric names to their ideal values
+METRIC_IDEALS = {
+    "Statistical Parity Difference": 0.0,
+    "Disparate Impact": 1.0,
+    "Average Odds Difference": 0.0,
+    "Equal Opportunity Difference": 0.0,
+    "Error Rate Difference": 0.0,
+    "Calibration Difference (global)": 0.0,
+}
 
 # --------------------------------------------------
 # Bias Index computation (PER PROTECTED ATTRIBUTE)
@@ -574,24 +190,74 @@ st.markdown("### Model under evaluation")
 model = st.selectbox("Select model", model_candidates)
 
 # --------------------------------------------------
-# Compute BI per protected attribute
+# Display selected metrics summary
+# --------------------------------------------------
+st.markdown("### Selected Fairness Metrics")
+
+# Calculate total metrics selected across all attributes
+total_metrics_selected = 0
+for attr, metrics_dict in selected_thresholds.items():
+    valid_metrics = [m for m in metrics_dict.keys() if m in METRIC_IDEALS]
+    total_metrics_selected += len(valid_metrics)
+
+st.info(f"{total_metrics_selected} total metrics selected across all protected attributes. The Bias Index will be calculated using only these selected metrics.")
+
+with st.expander("View selected metrics per protected attribute", expanded=False):
+    for attr, metrics_dict in selected_thresholds.items():
+        selected_metric_names = [m for m in metrics_dict.keys() if m in METRIC_IDEALS]
+        st.markdown(f"**{attr}** ({len(selected_metric_names)} metrics):")
+        if selected_metric_names:
+            for metric_name in selected_metric_names:
+                threshold = metrics_dict[metric_name].get('value', 'N/A')
+                st.markdown(f"  - {metric_name} (threshold: {threshold})")
+        else:
+            st.markdown("  - *No valid metrics selected*")
+        st.markdown("")
+
+# --------------------------------------------------
+# Compute BI per protected attribute (USING SELECTED METRICS ONLY)
 # --------------------------------------------------
 attr_BI = {}
 attr_metric_maps = {}
 
-for attr, df_attr in results_by_attr.items():
-    row = df_attr[df_attr["Model"] == model].iloc[0]
+try:
+    for attr, df_attr in results_by_attr.items():
+        row = df_attr[df_attr["Model"] == model].iloc[0]
+        
+        # Get selected metrics for this protected attribute
+        if attr not in selected_thresholds:
+            st.warning(f"No metrics selected for protected attribute '{attr}'. Skipping.")
+            continue
+        
+        # Build list of selected metrics with their ideal values
+        available_metrics = []
+        for metric_name, metric_config in selected_thresholds[attr].items():
+            # Check if this metric exists in the results DataFrame
+            if metric_name in df_attr.columns and metric_name in METRIC_IDEALS:
+                ideal_value = METRIC_IDEALS[metric_name]
+                available_metrics.append((metric_name, ideal_value))
 
-    available_metrics = [
-        (m, ideal) for m, ideal in FAIRNESS_METRICS if m in df_attr.columns
-    ]
+        if not available_metrics:
+            st.warning(f"No valid metrics found for protected attribute '{attr}'. Skipping.")
+            continue
 
-    bi, metric_map = compute_bias_index(row, available_metrics)
-    attr_BI[attr] = bi
-    attr_metric_maps[attr] = {
-        "metrics": metric_map,
-        "available_metrics": available_metrics,
-    }
+        bi, metric_map = compute_bias_index(row, available_metrics)
+        attr_BI[attr] = bi
+        attr_metric_maps[attr] = {
+            "metrics": metric_map,
+            "available_metrics": available_metrics,
+        }
+except Exception as e:
+    st.error(f"Error computing Bias Index: {str(e)}")
+    st.error(f"Available attributes: {list(results_by_attr.keys())}")
+    st.error(f"Selected model: {model}")
+    st.error(f"Selected thresholds: {list(selected_thresholds.keys())}")
+    st.stop()
+
+# Verify attr_BI was populated
+if not attr_BI:
+    st.error("No Bias Index values were computed. Please check that you have selected metrics for your protected attributes.")
+    st.stop()
 
 # --------------------------------------------------
 # Fairness Score aggregation (SYSTEM LEVEL)
@@ -677,41 +343,144 @@ for attr, bi in attr_BI.items():
     if metric_map:
         metric_names = list(metric_map.keys())
         values = [metric_map[m] for m in metric_names]
+        
+        # Cap Disparate Impact values at 2.0 for visualization purposes
+        values_capped = []
+        for m, v in zip(metric_names, values):
+            if m == "Disparate Impact" and v > 2.0:
+                values_capped.append(2.0)
+            else:
+                values_capped.append(v)
 
-        fig, ax = plt.subplots(figsize=(8, 4))
-        bars = ax.bar(metric_names, values)
-
+        fig, ax = plt.subplots(figsize=(10, 5))
+        
+        # Get thresholds for this attribute
+        attr_thresholds = selected_thresholds.get(attr, {})
+        
+        # Create horizontal scatter plot
+        y_positions = range(len(metric_names))
+        
+        # Plot threshold buffer zones (shaded rectangles around ideal values)
+        buffer_plotted = False
+        for i, (m, ideal) in enumerate(available_metrics):
+            if m in metric_names:
+                idx = metric_names.index(m)
+                threshold_val = attr_thresholds.get(m, {}).get('value', 0.1)
+                
+                # Determine buffer range based on metric type
+                if ideal == 1.0:  # Disparate Impact (ideal = 1.0)
+                    lower_bound = ideal - threshold_val
+                    upper_bound = ideal + threshold_val
+                else:  # Other metrics (ideal = 0.0)
+                    lower_bound = ideal - threshold_val
+                    upper_bound = ideal + threshold_val
+                
+                # Draw shaded buffer zone in dark blue
+                if not buffer_plotted:
+                    ax.barh(idx, upper_bound - lower_bound, left=lower_bound, 
+                           height=0.5, color='#1e3a8a', alpha=0.3, 
+                           edgecolor='none', label='Threshold Buffer')
+                    buffer_plotted = True
+                else:
+                    ax.barh(idx, upper_bound - lower_bound, left=lower_bound, 
+                           height=0.5, color='#1e3a8a', alpha=0.3, 
+                           edgecolor='none')
+        
+        # Plot ideal value lines (vertical dashed lines)
+        ideal_plotted = False
         for m, ideal in available_metrics:
             if m in metric_names:
-                ax.axhline(
-                    y=ideal,
-                    linestyle="--",
-                    linewidth=1,
-                    alpha=0.6,
-                    color="black"
-                )
-
-        ax.set_ylabel("Metric value")
-        ax.set_title(f"Fairness Metrics — {attr}")
-        ax.set_xticklabels(metric_names, rotation=30, ha="right")
-
-        for b, v in zip(bars, values):
-            ax.text(
-                b.get_x() + b.get_width() / 2,
-                b.get_height(),
-                f"{v:.3f}",
-                ha="center",
-                va="bottom",
-                fontsize=9
-            )
-
+                if not ideal_plotted:
+                    ax.axvline(x=ideal, color='gray', linestyle='--', 
+                              linewidth=1.5, alpha=0.7, zorder=1, label='Ideal Value')
+                    ideal_plotted = True
+                else:
+                    ax.axvline(x=ideal, color='gray', linestyle='--', 
+                              linewidth=1.5, alpha=0.7, zorder=1)
+        
+        # Plot actual values as scatter points
+        colors = []
+        markers = []
+        for m, v, v_capped in zip(metric_names, values, values_capped):
+            ideal = next((ideal for name, ideal in available_metrics if name == m), None)
+            threshold_val = attr_thresholds.get(m, {}).get('value', 0.1)
+            
+            if ideal is not None:
+                deviation = abs(v - ideal)
+                if deviation <= threshold_val:
+                    colors.append('#10b981')  # Green - within threshold
+                else:
+                    colors.append('#ef4444')  # Red - outside threshold
+            else:
+                colors.append('#94a3b8')  # Gray - unknown
+            
+            # Use triangle marker if value was capped
+            if m == "Disparate Impact" and v > 2.0:
+                markers.append('>')
+            else:
+                markers.append('o')
+        
+        # Plot points with different markers
+        for i, (v_capped, color, marker) in enumerate(zip(values_capped, colors, markers)):
+            ax.scatter(v_capped, i, s=200, c=color, marker=marker,
+                      edgecolors='black', linewidths=2, zorder=3, alpha=0.9)
+        
+        # Add value labels next to points
+        for i, (v, v_capped, m) in enumerate(zip(values, values_capped, metric_names)):
+            if m == "Disparate Impact" and v > 2.0:
+                label = f'  {v:.4f} (capped at 2.0)'
+            else:
+                label = f'  {v:.4f}'
+            ax.text(v_capped, i, label, 
+                   va='center', ha='left', fontsize=10, fontweight='bold')
+        
+        # Configure axes
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels(metric_names, fontsize=11)
+        ax.set_xlabel('Metric Value', fontsize=12, fontweight='bold')
+        ax.set_title(f'Fairness Metrics for {attr}', fontsize=14, fontweight='bold', pad=20)
+        ax.grid(axis='x', alpha=0.3, linestyle='--', linewidth=0.5)
+        ax.invert_yaxis()  # Top to bottom
+        ax.legend(loc='best', fontsize=10, framealpha=0.9)
+        
+        # Set x-axis limits with some padding
+        all_values = values_capped + [ideal for _, ideal in available_metrics]
+        x_min = min(all_values) - 0.1
+        x_max = max(all_values) + 0.2
+        ax.set_xlim(x_min, x_max)
+        
         plt.tight_layout()
         st.pyplot(fig)
+        
+        # Add explanation for DI capping
+        has_capped_di = any(m == "Disparate Impact" and v > 2.0 for m, v in zip(metric_names, values))
+        if has_capped_di:
+            st.info(
+                "Note: Disparate Impact (DI) values greater than 2.0 are capped at 2.0 for visualization clarity. "
+                "DI values can range from 0 to infinity, where 1.0 represents perfect parity. "
+                "Values significantly above 2.0 indicate extreme disparity but can make the chart difficult to read. "
+                "The actual (uncapped) values are shown in the labels and detailed table below."
+            )
 
-        st.caption(
-            "Dashed reference lines indicate ideal metric values. "
-            "These metrics are aggregated into the Bias Index (BIᵢ)."
-        )
+        
+        # Show metrics contributing to BI
+        with st.expander(f"Metric details for {attr}", expanded=False):
+            metric_details = []
+            for m in metric_names:
+                ideal = next((ideal for name, ideal in available_metrics if name == m), None)
+                actual = metric_map[m]
+                threshold_val = attr_thresholds.get(m, {}).get('value', 'N/A')
+                deviation = abs(actual - ideal) if ideal is not None else None
+                within_threshold = deviation <= threshold_val if (deviation is not None and threshold_val != 'N/A') else 'N/A'
+                metric_details.append({
+                    "Metric": m,
+                    "Actual Value": f"{actual:.4f}",
+                    "Ideal Value": f"{ideal:.4f}" if ideal is not None else "N/A",
+                    "Threshold": f"{threshold_val:.4f}" if threshold_val != 'N/A' else "N/A",
+                    "Deviation": f"{deviation:.4f}" if deviation is not None else "N/A",
+                    "Within Threshold": "Yes" if within_threshold == True else "No" if within_threshold == False else "N/A"
+                })
+            st.dataframe(pd.DataFrame(metric_details), use_container_width=True, hide_index=True)
     else:
         st.info("No fairness metrics available for this protected attribute.")
 
@@ -757,7 +526,7 @@ st.markdown(
 - **Fairness Score (FS)** is computed at the **system level** as:
 
 \[
-Fairness Score (FS) = 1 − √( average of squared Bias Indices across all protected attributes )
+FS = 1 − sqrt(mean(BI_i²)) across protected attributes
 \]
 
 
@@ -784,5 +553,3 @@ st.session_state["results"] = {
         "FS_conditional": FS_CONDITIONAL,
     },
 }
-
-st.success("Fairness assessment completed using standard-compliant aggregation.")
