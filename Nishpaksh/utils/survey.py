@@ -796,7 +796,7 @@ def render_survey(embedded: bool = True, require_identity: bool = True) -> Optio
                 st.session_state[SURVEY_KEY] = submission
                 if "responses_temp" in st.session_state:
                     del st.session_state["responses_temp"]
-                st.success(f"Survey saved. Risk: {submission['total_risk_score']:.1f} — {submission['risk_category']}")
+                st.success("Survey saved.")
                 with st.expander("Show submission JSON"):
                     st.json(submission)
                     st.write("Saved file:", saved)
