@@ -333,25 +333,25 @@ if model_file is not None:
 # DEBUG — AUTHORITATIVE STATE
 # --------------------------------------------------
 st.markdown("---")
-st.subheader("Authoritative Configuration")
 
-# Build display dict
-config_display = {
-    "ground_truth": st.session_state.get("ground_truth"),
-    "num_protected_attrs": st.session_state.get("num_protected_attrs"),
-}
+with st.expander("saved session variables", expanded=False):
 
-for i in range(1, 4):
-    if f"protected_attribute_{i}" in st.session_state:
-        config_display[f"protected_attribute_{i}"] = st.session_state[f"protected_attribute_{i}"]
-    if f"privileged_class_{i}" in st.session_state:
-        config_display[f"privileged_class_{i}"] = st.session_state[f"privileged_class_{i}"]
+    # Build display dict
+    config_display = {
+        "ground_truth": st.session_state.get("ground_truth"),
+        "num_protected_attrs": st.session_state.get("num_protected_attrs"),
+    }
 
-config_display["uploaded_data_present"] = "uploaded_data" in st.session_state
-config_display["model_file_present"] = "model_file" in st.session_state
+    for i in range(1, 4):
+        if f"protected_attribute_{i}" in st.session_state:
+            config_display[f"protected_attribute_{i}"] = st.session_state[f"protected_attribute_{i}"]
+        if f"privileged_class_{i}" in st.session_state:
+            config_display[f"privileged_class_{i}"] = st.session_state[f"privileged_class_{i}"]
 
-st.json(config_display)
+    config_display["uploaded_data_present"] = "uploaded_data" in st.session_state
+    config_display["model_file_present"] = "model_file" in st.session_state
 
+    st.json(config_display)
 # --------------------------------------------------
 # Sidebar status
 # --------------------------------------------------
@@ -412,3 +412,4 @@ with col3:
             break
         except Exception:
             pass
+
