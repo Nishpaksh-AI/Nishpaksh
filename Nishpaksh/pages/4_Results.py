@@ -514,30 +514,53 @@ for b, v in zip(bars, bi_vals):
 plt.tight_layout()
 st.pyplot(fig)
 
-# --------------------------------------------------
-# Decision rationale (STANDARD-COMPLIANT)
-# --------------------------------------------------
 st.markdown("### Decision Rationale")
 
 st.markdown(
+    """
+    #### Fairness Metrics Formulas
+    
+    **Bias Index (per protected attribute):**
+    """
+)
+
+st.latex(r"BI_i = \sqrt{\frac{\sum_{j=1}^{n} (M_{ij} - M'_j)^2}{n}}")
+
+st.markdown(
+    """
+    where:
+    - $i$ = protected attribute index
+    - $j$ = fairness metric index
+    - $n$ = total number of fairness metrics used
+    - $M_{ij}$ = value of jth metric for ith protected attribute
+    - $M'_j$ = ideal value of jth metric (0 for difference, 1 for ratio metrics)
+    
+    **Fairness Score (system level):**
+    """
+)
+
+st.latex(r"FS = 1 - \sqrt{\frac{\sum_{i=1}^{m} (BI_i)^2}{m}}")
+
+st.markdown(
+    """
+    which simplifies to:
+    """
+)
+
+st.latex(r"FS = 1 - \sqrt{\frac{\sum_{i=1}^{m} \sum_{j=1}^{n} (M_{ij} - M'_j)^2}{mn}}")
+
+st.markdown(
     f"""
-- **Bias Index (BIᵢ)** is computed **per protected attribute** as the root-mean-square
-  deviation of fairness metrics from their ideal values.
-- **Fairness Score (FS)** is computed at the **system level** as:
-
-\[
-FS = 1 − sqrt(mean(BI_i²)) across protected attributes
-\]
-
-
-
-**Decision thresholds applied**:
-- FS ≥ {FS_PASS} → **Model is fair**
-- FS ≥ {FS_CONDITIONAL} → **Slightly more unfairness, but acceptable**
-- Otherwise → **Model is unfair**
-
-
-"""
+    where $m$ = total number of protected attributes considered in the AI system.
+    
+    ---
+    
+    #### Decision Thresholds Applied
+    
+    - **FS ≥ {FS_PASS}** → Model is fair
+    - **FS ≥ {FS_CONDITIONAL}** → Slightly more unfairness, but acceptable  
+    - **Otherwise** → Model is unfair
+    """
 )
 
 # --------------------------------------------------
@@ -553,3 +576,4 @@ st.session_state["results"] = {
         "FS_conditional": FS_CONDITIONAL,
     },
 }
+
