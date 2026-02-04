@@ -570,14 +570,28 @@ def compute_submission_from_responses(responses: Dict[str, Dict[str, str]], mode
             return 10.0
         return 0.0
 
+        # ---------- PROXY BUCKET SCORING (CONTINUOUS, NORMALIZED) ----------
     for key, sections in proxy_buckets.items():
+        # Collect section-level averages for this proxy bucket
         vals = [section_avg.get(s, 0) for s in sections]
+
+        # Compute average risk for the proxy bucket
         if vals:
             avg_of_vals = sum(vals) / len(vals)
         else:
             avg_of_vals = 0.0
-        subscores[key] = avg_to_points(avg_of_vals)
+
+        # Normalize:
+        # section avg ∈ [0, 5]  → bucket score ∈ [0, 20]
+        bucket_score = avg_of_vals * 4
+
+        subscores[key] = round(bucket_score, 2)
         total_points += subscores[key]
+
+    # Ensure numerical stability and clean presentation
+    total_points = round(total_points, 2)
+    # ---------- END PROXY BUCKET SCORING ----------
+
 
     total_points = max(0.0, min(100.0, float(total_points)))
     submission = {
