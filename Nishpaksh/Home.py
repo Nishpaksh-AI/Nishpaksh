@@ -14,139 +14,176 @@ def img_to_base64(path):
 st.set_page_config(page_title="Nishpaksh", layout="centered")
 
 # ==================================================
+# Logo - positioned automatically above navigation
+# ==================================================
+# Search for logo file in common locations
+logo_paths = ["logo.png", "logo.jpg", "assets/logo.png", "assets/logo.jpg", 
+              "nishpaksh_logo.png", "nishpaksh_logo.jpg", "assets/nishpaksh_logo.png", 
+              "assets/nishpaksh_logo.jpg", "nishpaksh.png", "nishpaksh.jpg"]
+
+logo_path_found = None
+for logo_path in logo_paths:
+    try:
+        with open(logo_path, "rb") as f:
+            logo_path_found = logo_path
+            break
+    except FileNotFoundError:
+        continue
+
+if logo_path_found:
+    st.logo(logo_path_found)
+
+# ==================================================
 # DESIGN ONLY 
 # ==================================================
+
+
 st.markdown(
-    """
-    <style>
-    /* Import font */
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-    
-    /* Base typography */
-    .stApp {
-        font-family: 'Plus Jakarta Sans', sans-serif !important;
-    }
-    
-    /* Gradient headings */
-    h1 code, h2 code, h3 code {
-    -webkit-text-fill-color: initial !important;
-    background: none !important;
-    color: #2563eb !important;   /* readable blue */
-    font-weight: 700;
-     }
+"""
+<style>
+
+/* ============================================================
+   FONT
+============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+
+/* ============================================================
+   BASE TYPOGRAPHY
+============================================================ */
+.stApp {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+/* ============================================================
+   SIDEBAR STYLING
+============================================================ */
+section[data-testid="stSidebar"] {
+    padding-top: 0 !important;
+}
+
+/* ============================================================
+   LOGO SIZING (st.logo default is 24px, increase for visibility)
+============================================================ */
+[alt="Logo"] {
+    height: 10rem !important;
+    width: auto !important;
+    margin-bottom: 1rem !important;
+}
+
+/* ============================================================
+   SIDEBAR NAVIGATION
+============================================================ */
+[data-testid="stSidebarNav"] {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    padding: 1rem !important;
+    margin-left: 0.5rem !important;
+    margin-right: 0.5rem !important;
+    margin-top: 1rem !important;
+}
+
+/* ============================================================
+   NAV LINKS
+============================================================ */
+[data-testid="stSidebarNav"] a {
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 1rem !important;
+    margin-bottom: 0.5rem !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stSidebarNav"] a:hover {
+    border-color: #60a5fa !important;
+    background-color: rgba(96, 165, 250, 0.1) !important;
+    transform: translateX(4px);
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+    border-color: transparent !important;
+}
+
+/* ============================================================
+   CONTENT CARDS
+============================================================ */
+div[data-testid="stVerticalBlock"]
+> div[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 16px !important;
+    padding: 1.5rem !important;
+    margin-bottom: 1rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ============================================================
+   RADIO GROUPS
+============================================================ */
+div[data-testid="stRadio"] > div {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    padding: 1rem !important;
+}
+
+/* ============================================================
+   PRIMARY BUTTONS
+============================================================ */
+button[kind="primary"] {
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.6rem 1.5rem !important;
+    font-weight: 700 !important;
+}
+
+/* ============================================================
+   FILE UPLOADER
+============================================================ */
+div[data-testid="stFileUploader"] {
+    border-radius: 12px !important;
+    padding: 1.5rem !important;
+}
+
+/* ============================================================
+   METRICS
+============================================================ */
+div[data-testid="stMetric"] {
+    border-radius: 12px !important;
+    padding: 1rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ============================================================
+   MAIN CONTENT OFFSET
+============================================================ */
+section[data-testid="stMain"] > div:first-child {
+    padding-top: 3rem !important;
+}
+
+/* ============================================================
+   SCROLLBAR
+============================================================ */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+    border-radius: 10px;
+}
+
+</style>
+""",
+unsafe_allow_html=True
+)
+
+# ==================================================
+# LOGO INJECTION
+# ==================================================
 
     
-    /* Navigation sidebar - boxed style */
-    [data-testid="stSidebarNav"] {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 12px !important;
-        padding: 1rem !important;
-        margin: 1rem 0.5rem !important;
-    }
-    
-    [data-testid="stSidebarNav"] a {
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 8px !important;
-        padding: 0.75rem 1rem !important;
-        margin-bottom: 0.5rem !important;
-        transition: all 0.2s ease !important;
-    }
-    
-    [data-testid="stSidebarNav"] a:hover {
-        border-color: #60a5fa !important;
-        background-color: rgba(96, 165, 250, 0.1) !important;
-        transform: translateX(4px);
-    }
-    
-    [data-testid="stSidebarNav"] a[aria-current="page"] {
-        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
-        border-color: transparent !important;
-    }
-    
-    /* Content cards - smaller padding */
-    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 16px !important;
-        padding: 1.5rem !important;
-        margin-bottom: 1rem !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-    
-    /* Radio button containers */
-    div[data-testid="stRadio"] > div {
-        background-color: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 12px !important;
-        padding: 1rem !important;
-    }
-    
-    /* Primary buttons */
-    button[kind="primary"] {
-        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 0.6rem 1.5rem !important;
-        font-weight: 700 !important;
-    }
-    
-    /* File uploader */
-    div[data-testid="stFileUploader"] {
-        border-radius: 12px !important;
-        padding: 1.5rem !important;
-    }
-    
-    /* Metrics */
-    div[data-testid="stMetric"] {
-        border-radius: 12px !important;
-        padding: 1rem !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-    
-    /* Logo positioning */
-    .nishpaksh-logo {
-        position: fixed;
-        top: 16px;
-        left: 16px;
-        width: 120px;
-        z-index: 9999;
-    }
-    
-    [data-testid="stSidebarNav"] {
-        margin-top: 200px;
-    }
-    
-    /* Push main content down to avoid logo overlap */
-    section[data-testid="stMain"] > div:first-child {
-        padding-top: 3rem !important;
-    }
-    
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-        border-radius: 10px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-logo_b64 = img_to_base64("nishpaksh_logo.png")
-
-st.sidebar.markdown(
-    f"""
-    <div class="nishpaksh-logo">
-        <img src="data:image/png;base64,{logo_b64}" width="150"/>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-# ==================================================
-# ------------------ APP LOGIC ------------------
-# ==================================================
 st.title("Nishpaksh")
 
 # --------------------------------------------------
