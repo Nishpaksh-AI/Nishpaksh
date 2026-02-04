@@ -313,8 +313,8 @@ if not protected_attrs:
 # ==================================================
 # PAGE TABS
 # ==================================================
-tab_summary, tab_metrics, tab_narrative, tab_report = st.tabs(
-    ["Summary", "Fairness Metrics", "Narrative Inputs", "Generate Report"]
+tab_summary,tab_survey_summary, tab_metrics, tab_narrative, tab_report = st.tabs(
+    ["Summary", "Survey summary","Fairness metrics", "Narrative Inputs", "Generate Report"]
 )
 
 # ==================================================
@@ -458,20 +458,80 @@ with tab_summary:
                 "limitations relevant to fairness assessment."
             ),
         )
+
+
+
+# ==================================================
+# TAB — SURVEY SUMMARY (READ-ONLY)
+# ==================================================
+with tab_survey_summary:
+
+    st.markdown("## Assessment Summary (from Governance Survey)")
+
+    survey_outputs = st.session_state.get("survey_outputs")
+
+    if not survey_outputs:
+        st.info("No survey assessment found.")
+        st.stop()
+
+    # ---- Top-level metrics (same as Survey page) ----
+    c1, c2 = st.columns(2)
+
+    c1.metric(
+        "Overall Risk Score",
+        f"{survey_outputs['raw_submission'].get('total_risk_score', 0):.2f} / 5"
+    )
+
+    c2.metric(
+        "Risk Level",
+        survey_outputs['raw_submission'].get("risk_category", "Not Assessed")
+    )
+
+    # ---- Section-level table (same as Assessment Summary) ----
+    section_rows = []
+
+    for section, avg in survey_outputs["section_avg_risk"].items():
+        if avg >= 4:
+            level = "High Risk"
+        elif avg >= 3:
+            level = "Medium Risk"
+        elif avg >= 2:
+            level = "Low Risk"
+        elif avg > 0:
+            level = "Best Practice"
+        else:
+            level = "Not Assessed"
+
+        section_rows.append({
+            "Section": section,
+            "Average Risk Score (1–5)": round(avg, 2),
+            "Risk Level": level
+        })
+
+    st.dataframe(section_rows, use_container_width=True)
+
+
 # ==================================================
 # TAB 2 — FAIRNESS METRICS (ONE TABLE PER ATTRIBUTE)
 # ==================================================
 with tab_metrics:
-    METRICS = [
-        "Statistical Parity Difference",
-        "Disparate Impact",
-        "Average Odds Difference",
-        "Equal Opportunity Difference",
-        "Error Rate Difference",
-    ]
+
+    st.markdown("## Fairness Metrics Used in Evaluation")
+
+    thresholds = st.session_state.get("thresholds", {})
+
+    if not thresholds:
+        st.info("No fairness metrics were selected.")
+        st.stop()
 
     for attr in protected_attrs:
         st.markdown(f"### {attr}")
+
+        if attr not in thresholds:
+            st.info("No metrics selected for this protected attribute.")
+            continue
+
+        selected_metrics = list(thresholds[attr].keys())
 
         df_attr = inference["results_by_attr"][attr]
         row = df_attr[df_attr["Model"] == results["selected_model"]]
@@ -482,10 +542,19 @@ with tab_metrics:
 
         row = row.iloc[0]
 
-        st.dataframe(
-            [{"Metric": m, "Observed Value": row.get(m, np.nan)} for m in METRICS],
-            use_container_width=True
-        )
+        rows = []
+        for metric_name in selected_metrics:
+            if metric_name in df_attr.columns:
+                rows.append({
+                    "Metric": metric_name,
+                    "Observed Value": row.get(metric_name, np.nan),
+                    "Threshold": thresholds[attr][metric_name].get("value", "N/A"),
+                })
+
+        if rows:
+            st.dataframe(rows, use_container_width=True)
+        else:
+            st.info("No valid metrics available for this attribute.")
 
 # ==================================================
 # TAB 3 — NARRATIVE INPUTS
