@@ -226,6 +226,75 @@ except Exception:
     st.code(traceback.format_exc())
     st.stop()
 
+
+# --------------------------------------------------
+# PERSISTENT ASSESSMENT SUMMARY (ALWAYS VISIBLE)
+# --------------------------------------------------
+if submission and isinstance(submission, dict):
+
+    from utils.survey import SURVEY_SECTIONS, get_risk_score
+
+    st.subheader("Assessment Summary")
+
+    answers = submission.get("answers", {})
+
+    summary_rows = []
+    total_risk_sum = 0
+    total_applicable = 0
+    total_answered = 0
+    total_questions = 0
+
+    for section_name, section_meta in SURVEY_SECTIONS.items():
+        responses = answers.get(section_name, {})
+        sec_sum = 0
+        sec_count = 0
+
+        for resp in responses.values():
+            if resp not in ("", "Not Applicable"):
+                score = get_risk_score(resp)
+                if score > 0:
+                    sec_sum += score
+                    sec_count += 1
+
+        avg_risk = (sec_sum / sec_count) if sec_count > 0 else 0.0
+
+        if avg_risk >= 4.0:
+            level = "High Risk"
+        elif avg_risk >= 3.0:
+            level = "Medium Risk"
+        elif avg_risk >= 2.0:
+            level = "Low Risk"
+        elif avg_risk >= 1.0:
+            level = "Best Practice"
+        else:
+            level = "Not Assessed"
+
+        summary_rows.append({
+            "Section": section_name,
+            "Answered": f"{sec_count}/{len(section_meta['questions'])}",
+            "Avg Risk Score": f"{avg_risk:.2f}",
+            "Risk Level": level
+        })
+
+        total_risk_sum += sec_sum
+        total_applicable += sec_count
+        total_answered += sec_count
+        total_questions += len(section_meta["questions"])
+
+    overall_avg = (total_risk_sum / total_applicable) if total_applicable > 0 else 0.0
+    completion_pct = (total_answered / total_questions) * 100 if total_questions > 0 else 0.0
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Overall Risk Score", f"{overall_avg:.2f} / 5")
+    c2.metric("Risk Level", submission.get("risk_category", "Not Assessed"))
+    c3.metric("Overall Completion", f"{completion_pct:.1f}%")
+
+    st.dataframe(summary_rows, use_container_width=True)
+
+    st.markdown("---")
+
+
 # Survey not finished yet
 if not submission:
     st.info("Please complete and submit the survey to proceed.")
@@ -250,29 +319,70 @@ if not st.session_state.get("survey_completed"):
     st.session_state["survey_completed"] = True
 
 # --------------------------------------------------
-# Display Stored Summary
+# Display Stored Results (READ-ONLY, POST-SUBMISSION)
 # --------------------------------------------------
-survey_outputs = st.session_state.get("survey_outputs", {})
-
-
-# --------------------------------------------------
-# Preview: Proxy Risk Drivers (Ephemeral)
-# --------------------------------------------------
+survey_outputs = st.session_state.get("survey_outputs")
 plot_data = st.session_state.get("survey_plot_data")
 
+if not survey_outputs:
+    st.info("No stored survey results available.")
+    st.stop()
+
+# -------------------------------
+# Overall Risk (AS COMPUTED)
+# -------------------------------
+
+
+# -------------------------------
+# Proxy Bucket Contributions (0–20 each)
+# -------------------------------
+st.markdown("### Proxy Risk Contributions")
+
+proxy_rows = []
+for k, v in survey_outputs["proxy_subscores"].items():
+    proxy_rows.append({
+        "Proxy Bucket": k.replace("_", " ").title(),
+        "Risk Contribution (0–20)": round(v, 2)
+    })
+
+st.dataframe(proxy_rows, use_container_width=True)
+
+# -------------------------------
+# Proxy Risk Driver Plot
+# -------------------------------
+st.subheader("Risk Driver Preview")
+
 if plot_data and plot_data.get("proxy_subscores"):
-    st.subheader("Risk Driver Preview")
     fig = make_proxy_risk_plot(plot_data["proxy_subscores"])
     st.pyplot(fig)
     plt.close(fig)
 else:
     st.info("No proxy-level risk data available for visualization.")
 
-# --------------------------------------------------
-# Lock Notice
-# --------------------------------------------------
-st.markdown("---")
-st.caption(
-    "✔ Survey results are locked and stored for downstream reporting. "
-    "To modify responses, reset the session."
+# -------------------------------
+# Proxy Scoring Explainer
+# -------------------------------
+st.markdown(
+    """
+    **How to read this chart**
+
+    The bars below show how different **proxy risk buckets** contribute to the overall  risk.
+
+    - Survey answers are scored from **1 (best practice) to 5 (high risk)**
+    - Scores are averaged at the **section level** and grouped into five proxy buckets:
+
+      - **Decision impact** *(AI-based system, Deployment)*
+      - **Data provenance** *(Data)*
+      - **Population scope** *(Data, Human-in-the-loop)*
+      - **Model complexity** *(Model)*
+      - **Governance & oversight** *(Pipeline & infrastructure, Interface & integrations, Human-in-the-loop)*
+
+    Each proxy bucket score is computed as:
+
+    `Bucket score = (Average section risk) × 4`
+
+    This normalizes each bucket to **0–20**.
+    All five buckets together form the **total risk score (0–100)**.
+    """,
+    unsafe_allow_html=False
 )
